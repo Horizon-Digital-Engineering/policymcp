@@ -80,8 +80,8 @@ function saveMarkdownSection(
 function extractMarkdownSections(markdown: string): PolicySection[] {
   const sections: PolicySection[] = [];
   const lines = markdown.split("\n");
-  // Use lazy quantifier +? instead of + to prevent ReDoS
-  const headingRegex = /^(#{1,6})\s+(.+?)$/;
+  // Use bounded quantifier to prevent ReDoS
+  const headingRegex = /^(#{1,6})\s+(.{1,200})$/;
 
   let currentSection: PolicySection | null = null;
   let contentBuffer: string[] = [];
