@@ -224,5 +224,27 @@ Content here.`;
       // Metadata should be empty when extraction fails
       expect(result.metadata.author).toBeUndefined();
     });
+
+    it("should handle missing core.xml file", async () => {
+      const mockContent = "Test Content";
+
+      vi.mocked(mammoth.extractRawText).mockResolvedValue({
+        value: mockContent,
+        messages: [],
+      });
+
+      vi.mocked(readFile).mockResolvedValue(Buffer.from("mock-buffer"));
+
+      const mockZip = {
+        file: vi.fn().mockReturnValue(null), // No core.xml file
+      };
+
+      vi.mocked(JSZip.loadAsync).mockResolvedValue(mockZip as never);
+
+      const result = await parseDocx("/test/document.docx");
+
+      expect(result.content).toBe(mockContent);
+      expect(result.metadata.author).toBeUndefined();
+    });
   });
 });

@@ -339,5 +339,71 @@ This one has content`;
         "Invalid PDF"
       );
     });
+
+    it("should extract PDF metadata (author and dates)", async () => {
+      const mockContent = "Test Policy Content";
+      const mockInfo = {
+        Author: "John Doe",
+        CreationDate: "D:20250115120000",
+        ModDate: "D:20250116150000",
+      };
+
+      const mockParser = {
+        getText: vi.fn().mockResolvedValue({ text: mockContent }),
+        getInfo: vi.fn().mockResolvedValue({ total: 1, info: mockInfo }),
+        destroy: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
+
+      const result = await parsePDF("/test/path.pdf");
+
+      expect(result.metadata.author).toBe("John Doe");
+      // Date parsing converts to ISO string, exact time depends on local timezone
+      expect(result.metadata.createdDate).toContain("2025-01-15");
+      expect(result.metadata.modifiedDate).toContain("2025-01-16");
+    });
+
+    it("should handle PDFs without metadata", async () => {
+      const mockContent = "Test Policy Content";
+      const mockParser = {
+        getText: vi.fn().mockResolvedValue({ text: mockContent }),
+        getInfo: vi.fn().mockResolvedValue({ total: 1, info: {} }),
+        destroy: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
+
+      const result = await parsePDF("/test/path.pdf");
+
+      expect(result.metadata.author).toBeUndefined();
+      expect(result.metadata.createdDate).toBeUndefined();
+      expect(result.metadata.modifiedDate).toBeUndefined();
+    });
+
+    it("should handle invalid PDF date formats", async () => {
+      const mockContent = "Test Content";
+      const mockInfo = {
+        CreationDate: "InvalidDateFormat",
+        ModDate: null,
+      };
+
+      const mockParser = {
+        getText: vi.fn().mockResolvedValue({ text: mockContent }),
+        getInfo: vi.fn().mockResolvedValue({ total: 1, info: mockInfo }),
+        destroy: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
+
+      const result = await parsePDF("/test/path.pdf");
+
+      // Should return the original string if parsing fails
+      expect(result.metadata.createdDate).toBe("InvalidDateFormat");
+      expect(result.metadata.modifiedDate).toBeUndefined();
+    });
   });
 });

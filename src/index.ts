@@ -54,12 +54,14 @@ function createMCPServer(): McpServer {
   });
 
   // Register tools with Zod schemas
-  server.tool(
+  server.registerTool(
     "scan_document",
-    "Scan a policy document (PDF, Word, or Markdown) and extract policy information. The policy will be stored and made available for searching and querying.",
     {
-      filePath: z.string().describe("Absolute path to the document file to scan (PDF, .docx, or .md)"),
-      category: z.string().optional().describe("Optional category to assign to this policy (e.g., 'HR', 'Security', 'Compliance')"),
+      description: "Scan a policy document (PDF, Word, or Markdown) and extract policy information. The policy will be stored and made available for searching and querying.",
+      inputSchema: {
+        filePath: z.string().describe("Absolute path to the document file to scan (PDF, .docx, or .md)"),
+        category: z.string().optional().describe("Optional category to assign to this policy (e.g., 'HR', 'Security', 'Compliance')"),
+      },
     },
     async ({ filePath, category }) => {
       const resolvedPath = resolve(filePath);
@@ -111,12 +113,14 @@ function createMCPServer(): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "search_policies",
-    "Search through all loaded policies for relevant content. Returns matching policies and sections.",
     {
-      query: z.string().describe("Search query - keywords or phrases to find"),
-      category: z.string().optional().describe("Optional category to filter results"),
+      description: "Search through all loaded policies for relevant content. Returns matching policies and sections.",
+      inputSchema: {
+        query: z.string().describe("Search query - keywords or phrases to find"),
+        category: z.string().optional().describe("Optional category to filter results"),
+      },
     },
     async ({ query, category }) => {
       if (!query) {
@@ -170,11 +174,13 @@ function createMCPServer(): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "list_policies",
-    "List all loaded policies with their summaries. Use this to see what policies are available.",
     {
-      category: z.string().optional().describe("Optional category to filter the list"),
+      description: "List all loaded policies with their summaries. Use this to see what policies are available.",
+      inputSchema: {
+        category: z.string().optional().describe("Optional category to filter the list"),
+      },
     },
     async ({ category }) => {
       const policies = policyStore.listPolicies(category);
@@ -198,11 +204,13 @@ function createMCPServer(): McpServer {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "get_policy",
-    "Get the full content of a specific policy by its ID.",
     {
-      id: z.string().describe("The policy ID"),
+      description: "Get the full content of a specific policy by its ID.",
+      inputSchema: {
+        id: z.string().describe("The policy ID"),
+      },
     },
     async ({ id }) => {
       if (!id) {
@@ -286,7 +294,7 @@ async function main() {
     if (sessionId && transports[sessionId]) {
       // Reuse existing transport
       transport = transports[sessionId];
-    } else if (!sessionId) {
+    } else if (sessionId === undefined) {
       // New session - create transport (it will handle initialize request validation)
       const eventStore = new InMemoryEventStore();
       transport = new StreamableHTTPServerTransport({

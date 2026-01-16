@@ -619,9 +619,10 @@
 
         if (res.ok) {
           renderSearchResults(data.results);
-          policyCount.textContent = `${data.total} result${data.total !== 1 ? 's' : ''}`;
+          policyCount.textContent = `${data.total} result${data.total === 1 ? '' : 's'}`;
         }
       } catch (err) {
+        console.error('Search failed:', err);
         showToast('Search failed', 'error');
       }
     }
@@ -637,7 +638,7 @@
           <h3>${escapeHtml(r.title)}</h3>
           <div class="policy-meta">
             <span>Score: ${r.relevanceScore.toFixed(1)}</span>
-            <span>Matches: ${r.matchedSections.length} section${r.matchedSections.length !== 1 ? 's' : ''}</span>
+            <span>Matches: ${r.matchedSections.length} section${r.matchedSections.length === 1 ? '' : 's'}</span>
           </div>
           ${r.category ? `<span class="category-badge">${escapeHtml(r.category)}</span>` : ''}
         </div>
@@ -660,9 +661,10 @@
 
         if (res.ok) {
           renderPolicies(data.policies);
-          policyCount.textContent = `${data.total} polic${data.total !== 1 ? 'ies' : 'y'}`;
+          policyCount.textContent = `${data.total} polic${data.total === 1 ? 'y' : 'ies'}`;
         }
       } catch (err) {
+        console.error('Failed to load policies:', err);
         policiesGrid.innerHTML = '<div class="empty-state"><p>Failed to load policies</p></div>';
       }
     }
@@ -677,7 +679,7 @@
         <div class="policy-card" data-id="${p.id}">
           <h3>${escapeHtml(p.title)}</h3>
           <div class="policy-meta">
-            <span>${p.sectionCount} section${p.sectionCount !== 1 ? 's' : ''}</span>
+            <span>${p.sectionCount} section${p.sectionCount === 1 ? '' : 's'}</span>
             <span>${formatDate(p.extractedAt)}</span>
           </div>
           ${p.category ? `<span class="category-badge">${escapeHtml(p.category)}</span>` : ''}
@@ -702,7 +704,7 @@
         filterCategory.innerHTML = '<option value="">All categories</option>' +
           categories.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
       } catch (err) {
-        // Ignore
+        console.error('Failed to load categories:', err);
       }
     }
 
@@ -772,6 +774,7 @@
           showToast('Policy not found', 'error');
         }
       } catch (err) {
+        console.error('Failed to load policy:', err);
         showToast('Failed to load policy', 'error');
       }
     }
@@ -809,6 +812,7 @@
           showToast(data.error || 'Delete failed', 'error');
         }
       } catch (err) {
+        console.error('Delete failed:', err);
         showToast('Delete failed', 'error');
       }
     });
@@ -816,11 +820,11 @@
     // Utilities
     function escapeHtml(str) {
       if (!str) return '';
-      return str.replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+      return str.replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
     }
 
     function formatDate(dateStr) {

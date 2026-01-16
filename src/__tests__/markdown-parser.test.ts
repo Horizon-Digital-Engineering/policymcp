@@ -257,5 +257,59 @@ Content here.`;
       // Since extractTitle looks at stripped content, it should find "Employee Handbook"
       expect(result.title).toBe("Employee Handbook");
     });
+
+    it("should handle boolean and number metadata values", async () => {
+      const mockContent = `---
+title: Test Policy
+version: 2.5
+published: true
+count: 42
+---
+
+# Content`;
+
+      vi.mocked(readFile).mockResolvedValue(mockContent);
+
+      const result = await parseMarkdown("/test/policy.md");
+
+      expect(result.metadata.version).toBe(2.5);
+    });
+
+    it("should skip object metadata values", async () => {
+      const mockContent = `---
+title: Test Policy
+metadata:
+  key: value
+  nested: object
+---
+
+# Content`;
+
+      vi.mocked(readFile).mockResolvedValue(mockContent);
+
+      const result = await parseMarkdown("/test/policy.md");
+
+      // Objects should be skipped, not converted to [object Object]
+      expect(result.metadata.effectiveDate).toBeUndefined();
+    });
+
+    it("should handle empty sections gracefully", async () => {
+      const mockContent = `# Policy
+
+## Empty Section
+
+## Another Empty
+
+## Section with content
+This has content.`;
+
+      vi.mocked(readFile).mockResolvedValue(mockContent);
+
+      const result = await parseMarkdown("/test/policy.md");
+
+      // Only sections with content should be included
+      expect(result.sections).toHaveLength(1);
+      expect(result.sections[0].heading).toBe("Section with content");
+    });
   });
 });

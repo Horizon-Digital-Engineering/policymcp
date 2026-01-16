@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { Request, Response, NextFunction } from "express";
 
 // Mock jsonwebtoken before importing
@@ -23,15 +23,23 @@ vi.mock("jsonwebtoken", () => ({
 }));
 
 import jwt from "jsonwebtoken";
-import { createAuthMiddleware, type AuthenticatedRequest } from "../auth-manager.js";
+import {
+  createAuthMiddleware,
+  loadMcpAuthConfig,
+  loadWebAuthConfig,
+  requireAuth,
+  type AuthenticatedRequest
+} from "../auth-manager.js";
 
 describe("auth-manager", () => {
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
   let mockNext: vi.Mock<NextFunction>;
+  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    originalEnv = { ...process.env };
     mockReq = {
       headers: {},
     };
@@ -40,6 +48,10 @@ describe("auth-manager", () => {
       json: vi.fn().mockReturnThis() as unknown as Response["json"],
     };
     mockNext = vi.fn() as vi.Mock<NextFunction>;
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   describe("createAuthMiddleware - none mode", () => {
@@ -314,6 +326,214 @@ describe("auth-manager", () => {
       expect(consoleSpy).toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe("loadMcpAuthConfig", () => {
+    it("should default to 'none' mode when no env var set", () => {
+      delete process.env.MCP_AUTH_MODE;
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("none");
+    });
+
+    it("should load api-key mode configuration", () => {
+      process.env.MCP_AUTH_MODE = "api-key";
+      process.env.MCP_AUTH_API_KEY = "test-api-key";
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("api-key");
+      expect(config.apiKey).toBe("test-api-key");
+    });
+
+    it("should warn when api-key mode but no API key is set", () => {
+      process.env.MCP_AUTH_MODE = "api-key";
+      delete process.env.MCP_AUTH_API_KEY;
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("api-key");
+      expect(config.apiKey).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("MCP_AUTH_API_KEY is not set")
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should load jwt mode configuration", () => {
+      process.env.MCP_AUTH_MODE = "jwt";
+      process.env.MCP_AUTH_JWT_SECRET = "jwt-secret";
+      process.env.MCP_AUTH_JWT_AUDIENCE = "test-aud";
+      process.env.MCP_AUTH_JWT_ISSUER = "test-iss";
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("jwt");
+      expect(config.jwtSecret).toBe("jwt-secret");
+      expect(config.jwtAudience).toBe("test-aud");
+      expect(config.jwtIssuer).toBe("test-iss");
+    });
+
+    it("should warn when jwt mode but no secret is set", () => {
+      process.env.MCP_AUTH_MODE = "jwt";
+      delete process.env.MCP_AUTH_JWT_SECRET;
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("jwt");
+      expect(config.jwtSecret).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("MCP_AUTH_JWT_SECRET is not set")
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should fallback to 'none' for invalid mode", () => {
+      process.env.MCP_AUTH_MODE = "invalid-mode";
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("none");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid MCP_AUTH_MODE="invalid-mode"')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should handle uppercase mode values", () => {
+      process.env.MCP_AUTH_MODE = "API-KEY";
+      process.env.MCP_AUTH_API_KEY = "test-key";
+
+      const config = loadMcpAuthConfig();
+
+      expect(config.mode).toBe("api-key");
+    });
+  });
+
+  describe("loadWebAuthConfig", () => {
+    it("should default to 'none' mode when no env var set", () => {
+      delete process.env.WEB_AUTH_MODE;
+
+      const config = loadWebAuthConfig();
+
+      expect(config.mode).toBe("none");
+    });
+
+    it("should load api-key mode configuration", () => {
+      process.env.WEB_AUTH_MODE = "api-key";
+      process.env.WEB_AUTH_API_KEY = "web-api-key";
+
+      const config = loadWebAuthConfig();
+
+      expect(config.mode).toBe("api-key");
+      expect(config.apiKey).toBe("web-api-key");
+    });
+
+    it("should warn when api-key mode but no API key is set", () => {
+      process.env.WEB_AUTH_MODE = "api-key";
+      delete process.env.WEB_AUTH_API_KEY;
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const config = loadWebAuthConfig();
+
+      expect(config.mode).toBe("api-key");
+      expect(config.apiKey).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("WEB_AUTH_API_KEY is not set")
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should load jwt mode configuration", () => {
+      process.env.WEB_AUTH_MODE = "jwt";
+      process.env.WEB_AUTH_JWT_SECRET = "web-jwt-secret";
+      process.env.WEB_AUTH_JWT_AUDIENCE = "web-aud";
+      process.env.WEB_AUTH_JWT_ISSUER = "web-iss";
+
+      const config = loadWebAuthConfig();
+
+      expect(config.mode).toBe("jwt");
+      expect(config.jwtSecret).toBe("web-jwt-secret");
+      expect(config.jwtAudience).toBe("web-aud");
+      expect(config.jwtIssuer).toBe("web-iss");
+    });
+
+    it("should warn when jwt mode but no secret is set", () => {
+      process.env.WEB_AUTH_MODE = "jwt";
+      delete process.env.WEB_AUTH_JWT_SECRET;
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const config = loadWebAuthConfig();
+
+      expect(config.mode).toBe("jwt");
+      expect(config.jwtSecret).toBeUndefined();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("WEB_AUTH_JWT_SECRET is not set")
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should fallback to 'none' for invalid mode", () => {
+      process.env.WEB_AUTH_MODE = "invalid";
+
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      const config = loadWebAuthConfig();
+
+      expect(config.mode).toBe("none");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid WEB_AUTH_MODE="invalid"')
+      );
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("requireAuth", () => {
+    it("should allow authenticated requests", () => {
+      (mockReq as AuthenticatedRequest).auth = { authenticated: true };
+
+      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it("should reject unauthenticated requests", () => {
+      (mockReq as AuthenticatedRequest).auth = { authenticated: false };
+
+      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Unauthorized",
+        message: "Authentication required",
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should reject requests without auth object", () => {
+      delete (mockReq as AuthenticatedRequest).auth;
+
+      requireAuth(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
     });
   });
 });
