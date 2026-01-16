@@ -1,25 +1,79 @@
 import type { PolicySection, ParsedDocument } from "../types.js";
 
+// Patterns for detecting section headings
+const HEADING_PATTERNS = [
+  // Numbered sections: "1.", "1.1", "1.1.1", etc.
+  /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n]+)$/,
+  // Roman numerals: "I.", "II.", etc.
+  /^([IVXLC]{1,10}[.:-])\s*([^\n]+)$/i,
+  // Letter sections: "A.", "B.", etc.
+  /^([A-Z][.:-])\s*([^\n]+)$/,
+  // Multi-letter abbreviations: "ABC Something", "DEF Another"
+  /^([A-Z]{2,4})\s+([A-Z][^\n]+)$/,
+  // ALL CAPS headings
+  /^([A-Z][A-Z\s]{3,100})$/,
+];
+
+interface HeadingMatch {
+  heading: string;
+  level: number;
+}
+
+/**
+ * Try to match a line against heading patterns
+ */
+function tryMatchHeading(line: string): HeadingMatch | null {
+  for (const pattern of HEADING_PATTERNS) {
+    const match = pattern.exec(line);
+    if (match) {
+      return extractHeadingInfo(match);
+    }
+  }
+  return null;
+}
+
+/**
+ * Extract heading and level from regex match
+ */
+function extractHeadingInfo(match: RegExpMatchArray): HeadingMatch {
+  let heading: string;
+  let level = 1;
+
+  if (match[2]) {
+    heading = `${match[1]} ${match[2]}`.trim();
+    // Determine level from numbering depth (count dots between numbers, not trailing punctuation)
+    const numberPart = match[1].replace(/[.:-]$/, "");
+    const dots = (numberPart.match(/\./g) || []).length;
+    level = dots + 1;
+  } else {
+    heading = match[1].trim();
+  }
+
+  return { heading, level };
+}
+
+/**
+ * Save the current section if it has content
+ */
+function saveSection(
+  section: PolicySection | null,
+  contentBuffer: string[],
+  sections: PolicySection[]
+): void {
+  if (!section) return;
+
+  section.content = contentBuffer.join("\n").trim();
+  if (section.content) {
+    sections.push(section);
+  }
+}
+
 /**
  * Extract sections from document content using common heading patterns
  */
 export function extractSections(content: string): PolicySection[] {
   const sections: PolicySection[] = [];
   const lines = content.split("\n");
-
-  // Patterns for detecting section headings
-  const headingPatterns = [
-    // Numbered sections: "1.", "1.1", "1.1.1", etc.
-    /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n]+)$/,
-    // Roman numerals: "I.", "II.", etc.
-    /^([IVXLC]{1,10}[.:-])\s*([^\n]+)$/i,
-    // Letter sections: "A.", "B.", etc.
-    /^([A-Z][.:-])\s*([^\n]+)$/,
-    // Multi-letter abbreviations: "ABC Something", "DEF Another"
-    /^([A-Z]{2,4})\s+([A-Z][^\n]+)$/,
-    // ALL CAPS headings
-    /^([A-Z][A-Z\s]{3,100})$/,
-  ];
 
   let currentSection: PolicySection | null = null;
   let contentBuffer: string[] = [];
@@ -28,40 +82,16 @@ export function extractSections(content: string): PolicySection[] {
     const trimmedLine = line.trim();
     if (!trimmedLine) continue;
 
-    let isHeading = false;
-    let heading = "";
-    let level = 1;
+    const headingMatch = tryMatchHeading(trimmedLine);
 
-    for (const pattern of headingPatterns) {
-      const match = trimmedLine.match(pattern);
-      if (match) {
-        isHeading = true;
-        if (match[2]) {
-          heading = `${match[1]} ${match[2]}`.trim();
-          // Determine level from numbering depth (count dots between numbers, not trailing punctuation)
-          const numberPart = match[1].replace(/[.:-]$/, ""); // Remove trailing punctuation
-          const dots = (numberPart.match(/\./g) || []).length;
-          level = dots + 1;
-        } else {
-          heading = match[1].trim();
-        }
-        break;
-      }
-    }
-
-    if (isHeading && heading.length > 2 && heading.length < 200) {
+    if (headingMatch && headingMatch.heading.length > 2 && headingMatch.heading.length < 200) {
       // Save previous section
-      if (currentSection) {
-        currentSection.content = contentBuffer.join("\n").trim();
-        if (currentSection.content) {
-          sections.push(currentSection);
-        }
-      }
+      saveSection(currentSection, contentBuffer, sections);
 
       currentSection = {
-        heading,
+        heading: headingMatch.heading,
         content: "",
-        level,
+        level: headingMatch.level,
       };
       contentBuffer = [];
     } else if (currentSection) {
@@ -70,12 +100,7 @@ export function extractSections(content: string): PolicySection[] {
   }
 
   // Don't forget the last section
-  if (currentSection) {
-    currentSection.content = contentBuffer.join("\n").trim();
-    if (currentSection.content) {
-      sections.push(currentSection);
-    }
-  }
+  saveSection(currentSection, contentBuffer, sections);
 
   return sections;
 }
@@ -87,17 +112,20 @@ export function extractTitle(content: string, filePath: string): string {
   const lines = content.split("\n").filter((l) => l.trim());
 
   // Try to find a title in the first few lines
-  const metadataPattern =
-    /^(page|date|version|effective|revision|rev|dated|some|test|content)/i;
+  const metadataKeywords = [
+    "page", "date", "version", "effective", "revision", "rev", "dated", "some", "test", "content"
+  ];
+
   for (let i = 0; i < Math.min(5, lines.length); i++) {
     const line = lines[i].trim();
+    const lowerLine = line.toLowerCase();
+
     // Look for lines that look like titles (not metadata, should start with capital, not too generic)
-    if (
-      line.length > 5 &&
-      line.length < 150 &&
-      !metadataPattern.exec(line) &&
-      line[0] === line[0].toUpperCase()
-    ) {
+    const isValidLength = line.length > 5 && line.length < 150;
+    const startsWithCapital = line[0] === line[0].toUpperCase();
+    const isNotMetadata = !metadataKeywords.some(keyword => lowerLine.startsWith(keyword));
+
+    if (isValidLength && startsWithCapital && isNotMetadata) {
       return line;
     }
   }
@@ -128,7 +156,7 @@ export function extractMetadata(
   ];
 
   for (const pattern of datePatterns) {
-    const match = content.match(pattern);
+    const match = pattern.exec(content);
     if (match) {
       metadata.effectiveDate = match[1];
       break;
@@ -143,7 +171,7 @@ export function extractMetadata(
   ];
 
   for (const pattern of versionPatterns) {
-    const match = content.match(pattern);
+    const match = pattern.exec(content);
     if (match) {
       metadata.version = match[1];
       break;

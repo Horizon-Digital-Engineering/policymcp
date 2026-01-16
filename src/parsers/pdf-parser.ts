@@ -56,18 +56,19 @@ function parsePDFDate(pdfDate: string): string | undefined {
   if (!pdfDate || typeof pdfDate !== "string") return undefined;
 
   // PDF date format: D:YYYYMMDDHHmmSS+HH'mm'
-  const match = pdfDate.match(/^D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/);
+  const dateRegex = /^D:(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/;
+  const match = dateRegex.exec(pdfDate);
   if (!match) return pdfDate; // Return as-is if not in expected format
 
   const [, year, month, day, hour, minute, second] = match;
   try {
     const date = new Date(
-      parseInt(year),
-      parseInt(month) - 1,
-      parseInt(day),
-      parseInt(hour),
-      parseInt(minute),
-      parseInt(second)
+      Number.parseInt(year, 10),
+      Number.parseInt(month, 10) - 1,
+      Number.parseInt(day, 10),
+      Number.parseInt(hour, 10),
+      Number.parseInt(minute, 10),
+      Number.parseInt(second, 10)
     );
     return date.toISOString();
   } catch {

@@ -32,7 +32,11 @@ export async function parseMarkdown(filePath: string): Promise<ParsedDocument> {
     if (!value) return undefined;
     if (value instanceof Date) return value.toISOString();
     if (typeof value === "string") return value;
-    return String(value);
+    // For other types, attempt safe conversion
+    if (typeof value === "number" || typeof value === "boolean") {
+      return String(value);
+    }
+    return undefined; // Skip objects that don't have a meaningful string representation
   };
 
   const metadata: ParsedDocument["metadata"] = {
@@ -55,11 +59,28 @@ export async function parseMarkdown(filePath: string): Promise<ParsedDocument> {
 }
 
 /**
+ * Save markdown section if it has content
+ */
+function saveMarkdownSection(
+  section: PolicySection | null,
+  contentBuffer: string[],
+  sections: PolicySection[]
+): void {
+  if (!section) return;
+
+  section.content = contentBuffer.join("\n").trim();
+  if (section.content) {
+    sections.push(section);
+  }
+}
+
+/**
  * Extract sections from markdown headings
  */
 function extractMarkdownSections(markdown: string): PolicySection[] {
   const sections: PolicySection[] = [];
   const lines = markdown.split("\n");
+  const headingRegex = /^(#{1,6})\s+(.+)$/;
 
   let currentSection: PolicySection | null = null;
   let contentBuffer: string[] = [];
@@ -69,16 +90,11 @@ function extractMarkdownSections(markdown: string): PolicySection[] {
     if (!trimmedLine) continue;
 
     // Match markdown headings: # H1, ## H2, etc.
-    const headingMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
+    const headingMatch = headingRegex.exec(trimmedLine);
 
     if (headingMatch) {
       // Save previous section
-      if (currentSection) {
-        currentSection.content = contentBuffer.join("\n").trim();
-        if (currentSection.content) {
-          sections.push(currentSection);
-        }
-      }
+      saveMarkdownSection(currentSection, contentBuffer, sections);
 
       const level = headingMatch[1].length;
       const heading = headingMatch[2].trim();
@@ -95,12 +111,7 @@ function extractMarkdownSections(markdown: string): PolicySection[] {
   }
 
   // Don't forget the last section
-  if (currentSection) {
-    currentSection.content = contentBuffer.join("\n").trim();
-    if (currentSection.content) {
-      sections.push(currentSection);
-    }
-  }
+  saveMarkdownSection(currentSection, contentBuffer, sections);
 
   return sections;
 }
@@ -110,13 +121,13 @@ function extractMarkdownSections(markdown: string): PolicySection[] {
  */
 function stripHtmlTags(html: string): string {
   return html
-    .replace(/<[^>]*>/g, "") // Remove HTML tags
-    .replace(/&nbsp;/g, " ") // Replace &nbsp; with space
-    .replace(/&lt;/g, "<") // Replace &lt; with <
-    .replace(/&gt;/g, ">") // Replace &gt; with >
-    .replace(/&amp;/g, "&") // Replace &amp; with &
-    .replace(/&quot;/g, '"') // Replace &quot; with "
-    .replace(/&#39;/g, "'") // Replace &#39; with '
-    .replace(/\n\n+/g, "\n\n") // Collapse multiple newlines
+    .replaceAll(/<[^>]*>/g, "") // Remove HTML tags
+    .replaceAll("&nbsp;", " ") // Replace &nbsp; with space
+    .replaceAll("&lt;", "<") // Replace &lt; with <
+    .replaceAll("&gt;", ">") // Replace &gt; with >
+    .replaceAll("&amp;", "&") // Replace &amp; with &
+    .replaceAll("&quot;", '"') // Replace &quot; with "
+    .replaceAll("&#39;", "'") // Replace &#39; with '
+    .replaceAll(/\n\n+/g, "\n\n") // Collapse multiple newlines
     .trim();
 }

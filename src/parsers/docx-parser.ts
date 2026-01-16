@@ -49,23 +49,22 @@ async function extractDocxMetadata(
     const metadata: ParsedDocument["metadata"] = {};
 
     // Extract creator/author
-    const creatorMatch = coreXml.match(/<dc:creator>([^<]+)<\/dc:creator>/);
+    const creatorRegex = /<dc:creator>([^<]+)<\/dc:creator>/;
+    const creatorMatch = creatorRegex.exec(coreXml);
     if (creatorMatch) {
       metadata.author = creatorMatch[1];
     }
 
     // Extract creation date
-    const createdMatch = coreXml.match(
-      /<dcterms:created[^>]*>([^<]+)<\/dcterms:created>/
-    );
+    const createdRegex = /<dcterms:created[^>]*>([^<]+)<\/dcterms:created>/;
+    const createdMatch = createdRegex.exec(coreXml);
     if (createdMatch) {
       metadata.createdDate = createdMatch[1];
     }
 
     // Extract modified date
-    const modifiedMatch = coreXml.match(
-      /<dcterms:modified[^>]*>([^<]+)<\/dcterms:modified>/
-    );
+    const modifiedRegex = /<dcterms:modified[^>]*>([^<]+)<\/dcterms:modified>/;
+    const modifiedMatch = modifiedRegex.exec(coreXml);
     if (modifiedMatch) {
       metadata.modifiedDate = modifiedMatch[1];
     }
