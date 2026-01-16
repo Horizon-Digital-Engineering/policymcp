@@ -4,7 +4,7 @@ import express, { Express } from "express";
 import jwt from "jsonwebtoken";
 import { PolicyStore } from "../policy-store.js";
 import {
-  createAuthMiddleware,
+  createAuthHandler,
   type AuthConfig,
   type AuthenticatedRequest,
 } from "../auth-manager.js";
@@ -26,8 +26,8 @@ describe("Authentication Integration Tests", () => {
     const app = express();
     app.use(express.json());
 
-    const mcpAuth = createAuthMiddleware(mcpConfig);
-    const webAuth = createAuthMiddleware(webConfig);
+    const mcpAuth = createAuthHandler(mcpConfig);
+    const webAuth = createAuthHandler(webConfig);
 
     // Mock MCP endpoint
     app.post("/mcp", mcpAuth, (req, res) => {

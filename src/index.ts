@@ -20,13 +20,19 @@ import {
 } from "./parsers/index.js";
 import { PolicyStore } from "./policy-store.js";
 import {
-  createAuthMiddleware,
+  createAuthHandler,
   loadMcpAuthConfig,
   loadWebAuthConfig,
 } from "./auth-manager.js";
+import { readFile } from "node:fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Read version from package.json
+const packageJsonPath = join(__dirname, "../package.json");
+const packageJson = JSON.parse(await readFile(packageJsonPath, "utf-8"));
+const VERSION = packageJson.version;
 
 // Shared policy store
 const policyStore = new PolicyStore();
@@ -54,7 +60,7 @@ const upload = multer({
 function createMCPServer(): McpServer {
   const server = new McpServer({
     name: "policymcp",
-    version: "1.0.0",
+    version: VERSION,
   });
 
   // Register tools with Zod schemas
@@ -265,9 +271,9 @@ async function main() {
   const mcpAuthConfig = loadMcpAuthConfig();
   const webAuthConfig = loadWebAuthConfig();
 
-  console.error("Authentication Configuration:");
-  console.error(`  MCP endpoints: ${mcpAuthConfig.mode}`);
-  console.error(`  Web/API endpoints: ${webAuthConfig.mode}`);
+  console.log("Authentication Configuration:");
+  console.log(`  MCP endpoints: ${mcpAuthConfig.mode}`);
+  console.log(`  Web/API endpoints: ${webAuthConfig.mode}`);
 
   // Middleware
   app.use(cors({
@@ -291,9 +297,9 @@ async function main() {
   // Store active transports by session ID
   const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
-  // Create auth middleware instances
-  const mcpAuth = createAuthMiddleware(mcpAuthConfig);
-  const webAuth = createAuthMiddleware(webAuthConfig);
+  // Create auth handler instances
+  const mcpAuth = createAuthHandler(mcpAuthConfig);
+  const webAuth = createAuthHandler(webAuthConfig);
 
   // ============================================
   // MCP STREAMABLE HTTP ENDPOINTS
@@ -316,7 +322,7 @@ async function main() {
         eventStore,
         onsessioninitialized: (id) => {
           transports[id] = transport;
-          console.error(`New MCP session initialized: ${id}`);
+          console.log(`New MCP session initialized: ${id}`);
         },
       });
 
@@ -325,7 +331,7 @@ async function main() {
         const id = transport.sessionId;
         if (id && transports[id]) {
           delete transports[id];
-          console.error(`MCP session closed: ${id}`);
+          console.log(`MCP session closed: ${id}`);
         }
       };
 
@@ -495,7 +501,7 @@ async function main() {
   app.get("/health", (_req: Request, res: Response) => {
     res.json({
       status: "ok",
-      version: "1.0.0",
+      version: VERSION,
       policies: policyStore.count,
       activeSessions: Object.keys(transports).length,
     });
@@ -511,16 +517,16 @@ async function main() {
 
   // Graceful shutdown
   process.on("SIGTERM", () => {
-    console.error("SIGTERM received, shutting down...");
+    console.log("SIGTERM received, shutting down...");
     process.exit(0);
   });
 
   // Start server
   app.listen(port, host, () => {
-    console.error(`Policy MCP Server running at http://${host}:${port}`);
-    console.error(`  - Web UI: http://${host}:${port}`);
-    console.error(`  - MCP endpoint: http://${host}:${port}/mcp`);
-    console.error(`  - Health check: http://${host}:${port}/health`);
+    console.log(`Policy MCP Server running at http://${host}:${port}`);
+    console.log(`  - Web UI: http://${host}:${port}`);
+    console.log(`  - MCP endpoint: http://${host}:${port}/mcp`);
+    console.log(`  - Health check: http://${host}:${port}/health`);
   });
 }
 

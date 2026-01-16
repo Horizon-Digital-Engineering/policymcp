@@ -4,6 +4,7 @@ A Model Context Protocol (MCP) server for ingesting policy documents (PDF, Word,
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/Horizon-Digital-Engineering/policymcp/tree/main)
 
+[![Latest Release](https://img.shields.io/github/v/release/Horizon-Digital-Engineering/policymcp)](https://github.com/Horizon-Digital-Engineering/policymcp/releases/latest)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=Horizon-Digital-Engineering_policymcp&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=Horizon-Digital-Engineering_policymcp)
 [![CI](https://github.com/Horizon-Digital-Engineering/policymcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Horizon-Digital-Engineering/policymcp/actions/workflows/ci.yml)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
@@ -33,9 +34,11 @@ npm start
 ```
 
 The server will start at `http://localhost:3000`:
-- **Web UI**: `http://localhost:3000`
-- **MCP Endpoint**: `http://localhost:3000/mcp`
-- **Health Check**: `http://localhost:3000/health`
+- **Web UI**: `http://localhost:3000` - Browser interface for uploading and managing policy documents
+- **MCP Endpoint**: `http://localhost:3000/mcp` - For AI assistant integration
+- **Health Check**: `http://localhost:3000/health` - Server status and metrics
+
+Open your browser to `http://localhost:3000` to access the web interface and start uploading policy documents.
 
 ### Environment Variables
 
@@ -176,9 +179,17 @@ src/
 - **Word formatting loss**: Word documents are converted to plain text, losing formatting
 - **Markdown limitations**: Advanced markdown features (tables, code blocks) are flattened to text
 
+## Documentation
+
+Additional documentation is available in the `docs/` directory:
+
+- **[Architecture](docs/architecture.md)** - System design, component overview, and future roadmap
+- **[Authorization Guide](docs/authorization.md)** - Comprehensive authentication setup (API key, JWT, OAuth 2.1)
+- **[Agent Guide](AGENTS.md)** - Reference for AI agents and developers working with the codebase
+
 ## Contributing
 
-Contributions are welcome! Please read the license terms before contributing.
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) for details on our development process, code style, and how to submit pull requests. Be sure to review the license terms before contributing.
 
 ## License
 

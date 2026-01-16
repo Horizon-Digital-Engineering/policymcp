@@ -24,7 +24,7 @@ vi.mock("jsonwebtoken", () => ({
 
 import jwt from "jsonwebtoken";
 import {
-  createAuthMiddleware,
+  createAuthHandler,
   loadMcpAuthConfig,
   loadWebAuthConfig,
   requireAuth,
@@ -54,9 +54,9 @@ describe("auth-manager", () => {
     process.env = originalEnv;
   });
 
-  describe("createAuthMiddleware - none mode", () => {
+  describe("createAuthHandler - none mode", () => {
     it("should allow requests without authentication", () => {
-      const middleware = createAuthMiddleware({ mode: "none" });
+      const middleware = createAuthHandler({ mode: "none" });
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -65,7 +65,7 @@ describe("auth-manager", () => {
     });
 
     it("should set auth.authenticated to false", () => {
-      const middleware = createAuthMiddleware({ mode: "none" });
+      const middleware = createAuthHandler({ mode: "none" });
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
@@ -73,9 +73,9 @@ describe("auth-manager", () => {
     });
   });
 
-  describe("createAuthMiddleware - api-key mode", () => {
+  describe("createAuthHandler - api-key mode", () => {
     it("should reject requests without Authorization header", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "api-key",
         apiKey: "test-key",
       });
@@ -91,7 +91,7 @@ describe("auth-manager", () => {
     });
 
     it("should reject requests with invalid Bearer format", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "api-key",
         apiKey: "test-key",
       });
@@ -104,7 +104,7 @@ describe("auth-manager", () => {
     });
 
     it("should reject requests with wrong API key", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "api-key",
         apiKey: "test-key",
       });
@@ -121,7 +121,7 @@ describe("auth-manager", () => {
     });
 
     it("should allow requests with correct API key", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "api-key",
         apiKey: "test-key",
       });
@@ -135,7 +135,7 @@ describe("auth-manager", () => {
     });
 
     it("should return 500 if apiKey is not configured", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "api-key",
       });
       mockReq.headers = { authorization: "Bearer test-key" };
@@ -155,13 +155,13 @@ describe("auth-manager", () => {
     });
   });
 
-  describe("createAuthMiddleware - jwt mode", () => {
+  describe("createAuthHandler - jwt mode", () => {
     beforeEach(() => {
       (vi.mocked(jwt).verify as vi.Mock).mockReset();
     });
 
     it("should reject requests without Authorization header", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
       });
@@ -173,7 +173,7 @@ describe("auth-manager", () => {
     });
 
     it("should validate JWT with correct secret", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
         jwtAudience: "test-audience",
@@ -205,7 +205,7 @@ describe("auth-manager", () => {
     });
 
     it("should handle scopes as array", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
       });
@@ -222,7 +222,7 @@ describe("auth-manager", () => {
     });
 
     it("should handle missing scopes", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
       });
@@ -238,7 +238,7 @@ describe("auth-manager", () => {
     });
 
     it("should reject expired tokens", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
       });
@@ -261,7 +261,7 @@ describe("auth-manager", () => {
     });
 
     it("should reject invalid tokens", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
       });
@@ -284,7 +284,7 @@ describe("auth-manager", () => {
     });
 
     it("should handle unexpected JWT errors", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
         jwtSecret: "secret",
       });
@@ -309,7 +309,7 @@ describe("auth-manager", () => {
     });
 
     it("should return 500 if jwtSecret is not configured", () => {
-      const middleware = createAuthMiddleware({
+      const middleware = createAuthHandler({
         mode: "jwt",
       });
       mockReq.headers = { authorization: "Bearer token" };

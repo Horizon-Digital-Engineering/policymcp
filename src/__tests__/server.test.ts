@@ -92,11 +92,12 @@ describe("REST API Endpoints", () => {
       res.json(policy);
     });
 
-    app.post("/api/policies/search", (req, res) => {
+    app.get("/api/search", (req, res) => {
       try {
-        const { query, category } = req.body;
+        const query = req.query.query as string;
+        const category = req.query.category as string | undefined;
         if (!query) {
-          res.status(400).json({ error: "Query is required" });
+          res.status(400).json({ error: "Query parameter required" });
           return;
         }
         const results = policyStore.searchPolicies(query, category);
@@ -267,7 +268,7 @@ describe("REST API Endpoints", () => {
     });
   });
 
-  describe("POST /api/policies/search", () => {
+  describe("GET /api/search", () => {
     beforeAll(() => {
       policyStore.clear();
       policyStore.addPolicy(
@@ -290,8 +291,8 @@ describe("REST API Endpoints", () => {
 
     it("should search policies", async () => {
       const response = await request(app)
-        .post("/api/policies/search")
-        .send({ query: "encryption" });
+        .get("/api/search")
+        .query({ query: "encryption" });
 
       expect(response.status).toBe(200);
       expect(response.body.length).toBeGreaterThan(0);
@@ -300,8 +301,8 @@ describe("REST API Endpoints", () => {
 
     it("should search with category filter", async () => {
       const response = await request(app)
-        .post("/api/policies/search")
-        .send({ query: "encryption", category: "security" });
+        .get("/api/search")
+        .query({ query: "encryption", category: "security" });
 
       expect(response.status).toBe(200);
       expect(response.body.length).toBeGreaterThan(0);
@@ -309,17 +310,17 @@ describe("REST API Endpoints", () => {
 
     it("should return 400 when query is missing", async () => {
       const response = await request(app)
-        .post("/api/policies/search")
-        .send({});
+        .get("/api/search")
+        .query({});
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe("Query is required");
+      expect(response.body.error).toBe("Query parameter required");
     });
 
     it("should return empty array for no matches", async () => {
       const response = await request(app)
-        .post("/api/policies/search")
-        .send({ query: "nonexistent" });
+        .get("/api/search")
+        .query({ query: "nonexistent" });
 
       expect(response.status).toBe(200);
       expect(response.body).toEqual([]);

@@ -128,9 +128,9 @@ function authenticateJwt(token: string, config: AuthConfig, authReq: Authenticat
 }
 
 /**
- * Create authentication middleware based on configuration
+ * Create authentication handler based on configuration
  */
-export function createAuthMiddleware(config: AuthConfig) {
+export function createAuthHandler(config: AuthConfig) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const authReq = req as AuthenticatedRequest;
 
@@ -257,7 +257,7 @@ export function loadWebAuthConfig(): AuthConfig {
 
 /**
  * Middleware to check if request is authenticated
- * Use this AFTER createAuthMiddleware to enforce authentication
+ * Use this AFTER createAuthHandler to enforce authentication
  */
 export function requireAuth(
   req: Request,

@@ -1,6 +1,6 @@
-# CLAUDE.md - Policy MCP Development Guide
+# AGENTS.md - Policy MCP Development Guide
 
-This file provides guidance for AI assistants (like Claude) working with this codebase.
+This file provides guidance for AI agents working with this codebase.
 
 ## Project Overview
 
