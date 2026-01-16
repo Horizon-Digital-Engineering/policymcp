@@ -5,8 +5,8 @@ This file provides guidance for AI assistants (like Claude) working with this co
 ## Project Overview
 
 Policy MCP is a Model Context Protocol server that:
-1. Ingests PDF documents containing organizational policies
-2. Extracts and structures policy content
+1. Ingests policy documents (PDF, Word, Markdown) containing organizational policies
+2. Extracts and structures policy content with metadata (title, sections, author, dates)
 3. Exposes policies to AI chat assistants via MCP tools and resources
 4. Provides a web UI for policy management
 5. Supports flexible authentication (none, API key, or JWT)
@@ -37,14 +37,21 @@ npm start
 ```
 src/
 ├── index.ts          # Express server + MCP endpoints + REST API
-├── pdf-parser.ts     # PDF text extraction and section parsing
 ├── policy-store.ts   # In-memory policy storage with search
 ├── auth-manager.ts   # Authentication middleware (API key & JWT)
 ├── types.ts          # TypeScript interfaces
+├── parsers/
+│   ├── index.ts      # Unified document parser router
+│   ├── pdf-parser.ts # PDF text extraction and section parsing
+│   ├── docx-parser.ts # Word document parsing (mammoth, docx)
+│   ├── markdown-parser.ts # Markdown parsing (marked, gray-matter)
+│   └── shared.ts     # Shared parsing utilities
 ├── public/
 │   └── index.html    # Web UI for policy management
 └── __tests__/
     ├── pdf-parser.test.ts        # Unit tests for PDF parsing
+    ├── docx-parser.test.ts       # Unit tests for Word parsing
+    ├── markdown-parser.test.ts   # Unit tests for Markdown parsing
     ├── policy-store.test.ts      # Unit tests for policy storage
     ├── server.test.ts            # Integration tests for REST API
     ├── auth-manager.test.ts      # Unit tests for auth middleware
@@ -53,16 +60,37 @@ src/
 
 ## Key Components
 
-### PDF Parser (`pdf-parser.ts`)
+### Document Parsers (`parsers/`)
+
+**Unified Parser (`parsers/index.ts`):**
+- `parseDocument(filePath, mimeType)` - Routes to appropriate parser based on MIME type
+- Supports: PDF, Word (.docx), Markdown (.md)
+- Returns consistent `ParsedDocument` structure
+
+**PDF Parser (`parsers/pdf-parser.ts`):**
 - Uses `pdf-parse` library for text extraction
 - `parsePDF(filePath)` - Main entry point
+- Extracts metadata from PDF properties (author, created/modified dates)
+- Returns structured `ParsedDocument` with title, content, sections, and metadata
+
+**Word Parser (`parsers/docx-parser.ts`):**
+- Uses `mammoth` for text extraction and `docx` for metadata
+- Extracts author, created date, modified date from Word properties
+- Reuses section detection logic from shared utilities
+
+**Markdown Parser (`parsers/markdown-parser.ts`):**
+- Uses `marked` for parsing and `gray-matter` for YAML frontmatter
+- Extracts metadata from frontmatter (author, date, version)
+- Detects sections from markdown headings (# H1, ## H2, etc.)
+
+**Shared Utilities (`parsers/shared.ts`):**
 - `extractSections()` - Detects section headings via regex patterns (numbered, roman numerals, letters, ALL CAPS)
 - `extractMetadata()` - Finds effective dates and version numbers
-- Returns structured `ParsedPDF` with title, content, sections, and metadata
+- `extractTitle()` - Extracts document title from content or filename
 
 ### Policy Store (`policy-store.ts`)
 - In-memory Map-based storage (policies lost on restart)
-- `addPolicy()` - Store parsed PDF as policy with UUID
+- `addPolicy()` - Store parsed document as policy with UUID
 - `getPolicy(id)` - Retrieve policy by ID
 - `searchPolicies(query, category?)` - Full-text search with relevance scoring
 - `listPolicies(category?)` - Get summaries with optional category filter
@@ -88,7 +116,7 @@ src/
 - Separate auth for MCP vs Web/API endpoints
 
 **MCP Tools:**
-- `scan_pdf` - Scan a PDF file and extract policy information
+- `scan_document` - Scan a document (PDF, Word, or Markdown) and extract policy information
 - `search_policies` - Search through loaded policies by keywords
 - `list_policies` - List all loaded policies with summaries
 - `get_policy` - Get full content of a specific policy by ID
@@ -96,7 +124,7 @@ src/
 **REST API Endpoints:**
 - `GET /api/policies` - List all policies (optional `?category=` filter)
 - `GET /api/policies/:id` - Get single policy by ID
-- `POST /api/policies` - Upload PDF (multipart form with `file` field)
+- `POST /api/policies` - Upload document (multipart form with `file` field, supports PDF/DOCX/MD)
 - `DELETE /api/policies/:id` - Delete a policy
 - `GET /api/search` - Search policies (`?query=` required, `?category=` optional)
 - `GET /api/categories` - Get list of unique categories
@@ -164,7 +192,7 @@ npm run test:coverage
 
 ### Test Coverage
 
-- **PDF Parser**: 18 tests covering section extraction, metadata, error handling
+- **Document Parsers**: 50+ tests covering PDF, Word, Markdown parsing, section extraction, metadata
 - **Policy Store**: 30+ tests covering CRUD, search, filtering, relevance scoring
 - **REST API**: Integration tests for all endpoints (list, get, upload, delete, search)
 - **Auth Manager**: Unit tests for all auth modes (none, API key, JWT)
@@ -200,15 +228,22 @@ server.tool(
 
 2. Tool is automatically available via MCP protocol
 
-### Modifying PDF Parsing
+### Modifying Document Parsing
+
+**Adding Support for New Formats:**
+1. Create new parser in `src/parsers/your-format-parser.ts`
+2. Implement `DocumentParser` interface with `parse()` method
+3. Add MIME type to router in `parsers/index.ts`
+4. Add tests in `src/__tests__/your-format-parser.test.ts`
+5. Update documentation
 
 **Section Detection:**
-- Patterns are in `extractSections()` in `pdf-parser.ts`
+- Patterns are in `extractSections()` in `parsers/shared.ts`
 - Add new regex patterns to `headingPatterns` array
 - Adjust `level` calculation for new numbering schemes
 
 **Metadata Extraction:**
-- Patterns are in `extractMetadata()` in `pdf-parser.ts`
+- Patterns are in `extractMetadata()` in `parsers/shared.ts`
 - Add date patterns to `datePatterns` array
 - Add version patterns to `versionPatterns` array
 
@@ -269,6 +304,8 @@ server.tool(
 - **In-memory storage** - Policies lost on restart (no persistence)
 - **No OCR support** - Scanned PDFs won't parse well
 - **Basic section detection** - May miss complex/unusual formatting
+- **Word formatting loss** - Word documents converted to plain text, losing formatting
+- **Markdown limitations** - Advanced markdown features (tables, code blocks) flattened to text
 - **No persistent indexing** - Search rebuilds on every query
 - **No rate limiting** - API can be overwhelmed
 - **No user management** - Auth is all-or-nothing (no per-user permissions)
@@ -310,10 +347,12 @@ See [docs/architecture.md](architecture.md) for planned enhancements including:
 - Re-upload PDFs after server restart
 - Check policy ID is correct (UUIDs)
 
-**"Failed to parse PDF":**
-- Ensure file is a valid PDF
+**"Failed to parse document":**
+- Ensure file is a valid document (PDF/DOCX/MD)
 - Check PDF is not encrypted/password-protected
-- Try opening PDF in a viewer to verify it's not corrupted
+- Verify Word document is .docx format (not legacy .doc)
+- Ensure Markdown has valid UTF-8 encoding
+- Try opening document in appropriate viewer to verify it's not corrupted
 
 ### Test Failures
 

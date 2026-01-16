@@ -2,7 +2,7 @@
 
 ## Overview
 
-Policy MCP is a Model Context Protocol server that ingests PDF documents, extracts policy information, and exposes them to AI chat assistants. This enables AI systems to answer questions about organizational policies, compliance requirements, and procedural guidelines.
+Policy MCP is a Model Context Protocol server that ingests policy documents (PDF, Word, Markdown), extracts policy information, and exposes them to AI chat assistants. This enables AI systems to answer questions about organizational policies, compliance requirements, and procedural guidelines.
 
 ## System Architecture
 
@@ -16,13 +16,13 @@ Policy MCP is a Model Context Protocol server that ingests PDF documents, extrac
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Policy MCP Server                           │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
-│  │   MCP Tools     │  │  MCP Resources  │  │   MCP Prompts   │  │
-│  │                 │  │                 │  │                 │  │
-│  │ - scan_pdf      │  │ - policy://list │  │ - policy_query  │  │
-│  │ - search_policy │  │ - policy://{id} │  │                 │  │
-│  │ - list_policies │  │                 │  │                 │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
+│  ┌──────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
+│  │   MCP Tools      │  │  MCP Resources  │  │   MCP Prompts   │  │
+│  │                  │  │                 │  │                 │  │
+│  │ - scan_document  │  │ - policy://list │  │ - policy_query  │  │
+│  │ - search_policy  │  │ - policy://{id} │  │                 │  │
+│  │ - list_policies  │  │                 │  │                 │  │
+│  └──────────────────┘  └─────────────────┘  └─────────────────┘  │
 │                              │                                   │
 │                              ▼                                   │
 │  ┌─────────────────────────────────────────────────────────────┐│
@@ -53,11 +53,14 @@ Policy MCP is a Model Context Protocol server that ingests PDF documents, extrac
 ### 1. MCP Server (`src/index.ts`)
 The main entry point that initializes the MCP server and registers all tools, resources, and prompts.
 
-### 2. PDF Parser (`src/pdf-parser.ts`)
-Handles PDF ingestion and text extraction:
-- Uses `pdf-parse` library for text extraction
+### 2. Document Parser Modules (`src/parsers/`)
+Handles multi-format document ingestion and text extraction:
+- **PDF Parser** (`pdf-parser.ts`): Uses `pdf-parse` library for text extraction
+- **Word Parser** (`docx-parser.ts`): Uses `mammoth` and `docx` libraries for content and metadata
+- **Markdown Parser** (`markdown-parser.ts`): Uses `marked` and `gray-matter` for parsing and frontmatter
+- **Unified Interface** (`index.ts`): Routes to appropriate parser based on MIME type
 - Detects policy sections using heuristics (headers, numbering patterns)
-- Extracts metadata (title, date, version)
+- Extracts metadata (title, date, version, author, creation/modification dates)
 
 ### 3. Policy Store (`src/policy-store.ts`)
 In-memory storage and search:
@@ -99,7 +102,7 @@ interface PolicySection {
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `scan_pdf` | Scan a PDF file and extract policies | `filePath: string` |
+| `scan_document` | Scan a document (PDF, Word, or Markdown) and extract policies | `filePath: string` |
 | `search_policies` | Search policies by keyword/phrase | `query: string, category?: string` |
 | `list_policies` | List all loaded policies | `category?: string` |
 
@@ -122,28 +125,40 @@ interface PolicySection {
 - **Language**: TypeScript
 - **MCP SDK**: `@modelcontextprotocol/sdk`
 - **PDF Parsing**: `pdf-parse`
+- **Word Parsing**: `mammoth`, `docx`
+- **Markdown Parsing**: `marked`, `gray-matter`
 - **Build**: TypeScript compiler
 
 ## File Structure
 
 ```
 policymcp/
-├── ARCHITECTURE.md
-├── CLAUDE.md
+├── docs/
+│   ├── architecture.md   # System architecture
+│   ├── authorization.md  # Auth documentation
+│   └── claude.md         # Claude integration guide
 ├── package.json
 ├── tsconfig.json
 ├── src/
 │   ├── index.ts          # MCP server entry point
-│   ├── pdf-parser.ts     # PDF text extraction
 │   ├── policy-store.ts   # Policy storage & search
-│   └── types.ts          # TypeScript interfaces
+│   ├── auth-manager.ts   # Authentication middleware
+│   ├── types.ts          # TypeScript interfaces
+│   ├── parsers/
+│   │   ├── index.ts      # Unified parser interface
+│   │   ├── pdf-parser.ts # PDF text extraction
+│   │   ├── docx-parser.ts # Word document parsing
+│   │   ├── markdown-parser.ts # Markdown parsing
+│   │   └── shared.ts     # Shared parsing utilities
+│   └── public/
+│       └── index.html    # Web UI
 └── policies/             # Default policy directory
 ```
 
 ## Usage Flow
 
 1. **Initialization**: MCP server starts and loads any pre-existing policies
-2. **Ingestion**: User/AI calls `scan_pdf` tool to ingest new PDFs
+2. **Ingestion**: User/AI calls `scan_document` tool to ingest new documents (PDF, Word, or Markdown)
 3. **Query**: AI uses `search_policies` or reads resources to find relevant policies
 4. **Response**: AI uses policy content to answer user questions
 

@@ -1,6 +1,6 @@
 # Policy MCP
 
-A Model Context Protocol (MCP) server for ingesting PDF policy documents and exposing them to AI assistants.
+A Model Context Protocol (MCP) server for ingesting policy documents (PDF, Word, Markdown) and exposing them to AI assistants.
 
 [![Deploy to DO](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/Horizon-Digital-Engineering/policymcp/tree/main)
 
@@ -10,7 +10,8 @@ A Model Context Protocol (MCP) server for ingesting PDF policy documents and exp
 
 ## Features
 
-- **PDF Ingestion**: Upload PDF policy documents via web UI or MCP tools
+- **Multi-Format Support**: Upload PDF, Word (.docx), and Markdown (.md) policy documents
+- **Metadata Extraction**: Automatically extracts title, version, dates, and author from document properties
 - **Full-Text Search**: Search across all loaded policies with relevance scoring
 - **MCP Protocol**: Exposes policies via the Model Context Protocol for AI assistants
 - **Web UI**: Browser-based interface for uploading and managing policies
@@ -52,27 +53,11 @@ The server will start at `http://localhost:3000`:
 
 See [`.env.example`](.env.example) for full configuration options and [docs/authorization.md](docs/authorization.md) for authentication setup.
 
-## Connecting Claude Desktop
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "policymcp": {
-      "url": "https://your-app.ondigitalocean.app/mcp"
-    }
-  }
-}
-```
-
-Then restart Claude Desktop. The policy tools will be available via the hammer icon.
-
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `scan_pdf` | Scan a PDF file and extract policy information |
+| `scan_document` | Scan a document (PDF, Word, or Markdown) and extract policy information |
 | `search_policies` | Search through loaded policies by keywords |
 | `list_policies` | List all loaded policies with summaries |
 | `get_policy` | Get full content of a specific policy by ID |
@@ -85,7 +70,7 @@ Then restart Claude Desktop. The policy tools will be available via the hammer i
 |--------|------|-------------|
 | `GET` | `/api/policies` | List all policies (optional `?category=` filter) |
 | `GET` | `/api/policies/:id` | Get single policy by ID |
-| `POST` | `/api/policies` | Upload PDF (multipart form with `file` field) |
+| `POST` | `/api/policies` | Upload document (multipart form with `file` field, supports PDF/DOCX/MD) |
 | `DELETE` | `/api/policies/:id` | Delete a policy |
 | `GET` | `/api/search` | Search policies (`?query=` required, `?category=` optional) |
 | `GET` | `/api/categories` | Get list of unique categories |
@@ -169,12 +154,18 @@ Ensure `HOST=0.0.0.0` is set for cloud deployments.
 
 ```
 src/
-├── index.ts          # Express server, MCP setup, API routes
-├── pdf-parser.ts     # PDF text extraction and section parsing
-├── policy-store.ts   # In-memory policy storage with search
-├── types.ts          # TypeScript interfaces
+├── index.ts              # Express server, MCP setup, API routes
+├── policy-store.ts       # In-memory policy storage with search
+├── auth-manager.ts       # Authentication middleware (API key, JWT)
+├── types.ts              # TypeScript interfaces
+├── parsers/
+│   ├── index.ts          # Unified document parser router
+│   ├── pdf-parser.ts     # PDF text extraction and metadata
+│   ├── docx-parser.ts    # Word document parsing with mammoth
+│   ├── markdown-parser.ts # Markdown parsing with gray-matter
+│   └── shared.ts         # Shared parsing utilities
 └── public/
-    └── index.html    # Web UI (single-page app)
+    └── index.html        # Web UI (single-page app)
 ```
 
 ## Known Limitations
@@ -182,6 +173,8 @@ src/
 - **In-memory storage**: Policies are lost on server restart
 - **No OCR**: Scanned PDFs with images are not supported
 - **Basic section detection**: Complex document formatting may not parse correctly
+- **Word formatting loss**: Word documents are converted to plain text, losing formatting
+- **Markdown limitations**: Advanced markdown features (tables, code blocks) are flattened to text
 
 ## Contributing
 
