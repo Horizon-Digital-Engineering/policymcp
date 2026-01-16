@@ -113,20 +113,26 @@ export function extractTitle(content: string, filePath: string): string {
   const lines = content.split("\n").filter((l) => l.trim());
 
   // Try to find a title in the first few lines
-  const metadataKeywords = [
-    "page", "date", "version", "effective", "revision", "rev", "dated", "some", "test", "content"
-  ];
-
-  for (let i = 0; i < Math.min(5, lines.length); i++) {
+  for (let i = 0; i < Math.min(10, lines.length); i++) {
     const line = lines[i].trim();
     const lowerLine = line.toLowerCase();
 
-    // Look for lines that look like titles (not metadata, should start with capital, not too generic)
-    const isValidLength = line.length > 5 && line.length < 150;
-    const startsWithCapital = line.length > 0 && /^[A-Z]/.test(line);
-    const isNotMetadata = !metadataKeywords.some(keyword => lowerLine.startsWith(keyword));
+    // Skip lines that contain page numbers or other metadata
+    if (lowerLine.includes("page ") ||
+        lowerLine.startsWith("date") ||
+        lowerLine.startsWith("version") ||
+        lowerLine.startsWith("effective") ||
+        lowerLine.startsWith("revision") ||
+        lowerLine.startsWith("rev ")) {
+      continue;
+    }
 
-    if (isValidLength && startsWithCapital && isNotMetadata) {
+    // Look for lines that look like titles
+    const isValidLength = line.length > 5 && line.length < 150;
+    const startsWithCapital = /^[A-Z]/.test(line);
+    const hasMultipleWords = line.split(/\s+/).length >= 2;
+
+    if (isValidLength && startsWithCapital && hasMultipleWords) {
       return line;
     }
   }
