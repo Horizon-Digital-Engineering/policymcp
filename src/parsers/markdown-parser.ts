@@ -122,13 +122,13 @@ function extractMarkdownSections(markdown: string): PolicySection[] {
  */
 function stripHtmlTags(html: string): string {
   return html
-    .replaceAll(/<[^>]*>/g, "") // Remove HTML tags
+    .replaceAll(/<[^>]{0,1000}>/g, "") // Remove HTML tags (limit to prevent ReDoS)
     .replaceAll("&nbsp;", " ") // Replace &nbsp; with space
     .replaceAll("&lt;", "<") // Replace &lt; with <
     .replaceAll("&gt;", ">") // Replace &gt; with >
     .replaceAll("&amp;", "&") // Replace &amp; with &
     .replaceAll("&quot;", '"') // Replace &quot; with "
     .replaceAll("&#39;", "'") // Replace &#39; with '
-    .replaceAll(/\n\n+/g, "\n\n") // Collapse multiple newlines
+    .replaceAll(/\n{3,}/g, "\n\n") // Collapse multiple newlines (ReDoS-safe)
     .trim();
 }

@@ -1,18 +1,18 @@
 import type { PolicySection, ParsedDocument } from "../types.js";
 
 // Patterns for detecting section headings
-// Using [^\n\r]* instead of [^\n]+ to prevent ReDoS attacks
+// Using bounded quantifiers to prevent ReDoS attacks
 const HEADING_PATTERNS = [
   // Numbered sections: "1.", "1.1", "1.1.1", etc.
-  /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n\r]+?)$/,
+  /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n\r]{1,200})$/,
   // Roman numerals: "I.", "II.", etc.
-  /^([IVXLC]{1,10}[.:-])\s*([^\n\r]+?)$/i,
+  /^([IVXLC]{1,10}[.:-])\s*([^\n\r]{1,200})$/i,
   // Letter sections: "A.", "B.", etc.
-  /^([A-Z][.:-])\s*([^\n\r]+?)$/,
+  /^([A-Z][.:-])\s*([^\n\r]{1,200})$/,
   // Multi-letter abbreviations: "ABC Something", "DEF Another"
-  /^([A-Z]{2,4})\s+([A-Z][^\n\r]+?)$/,
+  /^([A-Z]{2,4})\s+([A-Z][^\n\r]{1,200})$/,
   // ALL CAPS headings
-  /^([A-Z][A-Z\s]{3,100}?)$/,
+  /^([A-Z][A-Z\s]{3,100})$/,
 ];
 
 interface HeadingMatch {
@@ -123,7 +123,7 @@ export function extractTitle(content: string, filePath: string): string {
 
     // Look for lines that look like titles (not metadata, should start with capital, not too generic)
     const isValidLength = line.length > 5 && line.length < 150;
-    const startsWithCapital = line[0] === line[0].toUpperCase();
+    const startsWithCapital = line.length > 0 && /^[A-Z]/.test(line);
     const isNotMetadata = !metadataKeywords.some(keyword => lowerLine.startsWith(keyword));
 
     if (isValidLength && startsWithCapital && isNotMetadata) {
@@ -151,9 +151,9 @@ export function extractMetadata(
 
   // Try to find effective date
   const datePatterns = [
-    /effective\s*(?:date)?[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
-    /dated?[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
-    /(\w+\s+\d{1,2},?\s+\d{4})/i,
+    /effective\s{0,5}(?:date)?[:\s]{0,5}(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+    /dated?[:\s]{0,5}(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+    /(\w{3,20}\s+\d{1,2},?\s+\d{4})/i,
   ];
 
   for (const pattern of datePatterns) {
@@ -166,9 +166,9 @@ export function extractMetadata(
 
   // Try to find version
   const versionPatterns = [
-    /version[:\s]*(\d+(?:\.\d+)*)/i,
-    /rev(?:ision)?[:\s]*(\d+(?:\.\d+)*)/i,
-    /v(\d+(?:\.\d+)*)/i,
+    /version[:\s]{0,5}(\d+(?:\.\d+){0,5})/i,
+    /rev(?:ision)?[:\s]{0,5}(\d+(?:\.\d+){0,5})/i,
+    /v(\d+(?:\.\d+){0,5})/i,
   ];
 
   for (const pattern of versionPatterns) {

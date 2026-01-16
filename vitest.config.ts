@@ -13,12 +13,13 @@ export default defineConfig({
         'dist/',
         'src/**/*.d.ts',
         'src/types.ts',
+        'src/index.ts', // Exclude main entry point (server bootstrap code)
       ],
       thresholds: {
-        branches: 60,
-        functions: 60,
-        lines: 60,
-        statements: 60,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+        statements: 80,
       },
     },
   },

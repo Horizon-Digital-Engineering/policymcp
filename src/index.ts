@@ -5,9 +5,10 @@ import cors from "cors";
 import multer from "multer";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { unlink } from "node:fs/promises";
+import { unlink, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -30,9 +31,12 @@ const __dirname = dirname(__filename);
 // Shared policy store
 const policyStore = new PolicyStore();
 
+// Use system temp directory with app-specific subdirectory for better security
+const UPLOAD_DIR = join(tmpdir(), "policymcp-uploads");
+
 // Configure multer for file uploads
 const upload = multer({
-  dest: "/tmp/policymcp-uploads/",
+  dest: UPLOAD_DIR,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: (_req, file, cb) => {
     if (SUPPORTED_MIME_TYPES.includes(file.mimetype as typeof SUPPORTED_MIME_TYPES[number])) {
@@ -243,9 +247,19 @@ function createMCPServer(): McpServer {
 // ============================================
 
 async function main() {
+  // Ensure upload directory exists
+  try {
+    await mkdir(UPLOAD_DIR, { recursive: true });
+  } catch (error) {
+    console.error("Failed to create upload directory:", error);
+  }
+
   const app = express();
   const port = Number.parseInt(process.env.PORT || "3000", 10);
   const host = process.env.HOST || "0.0.0.0";
+
+  // Disable Express version disclosure for security
+  app.disable("x-powered-by");
 
   // Load authentication configurations
   const mcpAuthConfig = loadMcpAuthConfig();
