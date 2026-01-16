@@ -121,13 +121,14 @@ function extractTitle(content: string, filePath: string): string {
   const lines = content.split("\n").filter((l) => l.trim());
 
   // Try to find a title in the first few lines
+  const metadataPattern = /^(page|date|version|effective|revision|rev|dated|some|test|content)/i;
   for (let i = 0; i < Math.min(5, lines.length); i++) {
     const line = lines[i].trim();
     // Look for lines that look like titles (not metadata, should start with capital, not too generic)
     if (
       line.length > 5 &&
       line.length < 150 &&
-      !line.match(/^(page|date|version|effective|revision|rev|dated|some|test|content)/i) &&
+      !metadataPattern.exec(line) &&
       line[0] === line[0].toUpperCase()
     ) {
       return line;

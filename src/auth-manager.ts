@@ -2,10 +2,15 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
 /**
+ * Authentication mode type
+ */
+export type AuthMode = "none" | "api-key" | "jwt";
+
+/**
  * Authentication configuration
  */
 export interface AuthConfig {
-  mode: "none" | "api-key" | "jwt";
+  mode: AuthMode;
   apiKey?: string;
   jwtSecret?: string;
   jwtAudience?: string;
@@ -24,6 +29,105 @@ export interface AuthenticatedRequest extends Request {
 }
 
 /**
+ * Parse JWT scopes from token payload
+ */
+function parseJwtScopes(scope: unknown): string[] | undefined {
+  if (!scope) {
+    return undefined;
+  }
+  if (Array.isArray(scope)) {
+    return scope;
+  }
+  if (typeof scope === "string") {
+    return scope.split(" ");
+  }
+  return undefined;
+}
+
+/**
+ * Handle JWT verification errors
+ */
+function handleJwtError(error: unknown, res: Response): void {
+  if (error instanceof jwt.TokenExpiredError || (error as Error).name === "TokenExpiredError") {
+    res.status(401).json({
+      error: "Unauthorized",
+      message: "Token has expired",
+    });
+    return;
+  }
+
+  if (error instanceof jwt.JsonWebTokenError || (error as Error).name === "JsonWebTokenError") {
+    res.status(401).json({
+      error: "Unauthorized",
+      message: "Invalid token",
+    });
+    return;
+  }
+
+  console.error("JWT verification error:", error);
+  res.status(500).json({
+    error: "Internal Server Error",
+    message: "Token verification failed",
+  });
+}
+
+/**
+ * Authenticate using API key
+ */
+function authenticateApiKey(token: string, config: AuthConfig, authReq: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (!config.apiKey) {
+    console.error("AUTH_MODE=api-key but AUTH_API_KEY is not configured");
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Authentication not properly configured",
+    });
+    return;
+  }
+
+  if (token !== config.apiKey) {
+    res.status(401).json({
+      error: "Unauthorized",
+      message: "Invalid API key",
+    });
+    return;
+  }
+
+  authReq.auth = { authenticated: true };
+  next();
+}
+
+/**
+ * Authenticate using JWT
+ */
+function authenticateJwt(token: string, config: AuthConfig, authReq: AuthenticatedRequest, res: Response, next: NextFunction): void {
+  if (!config.jwtSecret) {
+    console.error("AUTH_MODE=jwt but AUTH_JWT_SECRET is not configured");
+    res.status(500).json({
+      error: "Internal Server Error",
+      message: "Authentication not properly configured",
+    });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      audience: config.jwtAudience,
+      issuer: config.jwtIssuer,
+    }) as jwt.JwtPayload;
+
+    authReq.auth = {
+      authenticated: true,
+      userId: decoded.sub,
+      scopes: parseJwtScopes(decoded.scope),
+    };
+
+    next();
+  } catch (error) {
+    handleJwtError(error, res);
+  }
+}
+
+/**
  * Create authentication middleware based on configuration
  */
 export function createAuthMiddleware(config: AuthConfig) {
@@ -39,7 +143,7 @@ export function createAuthMiddleware(config: AuthConfig) {
 
     // Extract bearer token from Authorization header
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    if (!authHeader?.startsWith("Bearer ")) {
       res.status(401).json({
         error: "Unauthorized",
         message: "Missing or invalid Authorization header. Expected: Authorization: Bearer <token>",
@@ -51,80 +155,14 @@ export function createAuthMiddleware(config: AuthConfig) {
 
     // API Key authentication
     if (config.mode === "api-key") {
-      if (!config.apiKey) {
-        console.error("AUTH_MODE=api-key but AUTH_API_KEY is not configured");
-        res.status(500).json({
-          error: "Internal Server Error",
-          message: "Authentication not properly configured",
-        });
-        return;
-      }
-
-      if (token !== config.apiKey) {
-        res.status(401).json({
-          error: "Unauthorized",
-          message: "Invalid API key",
-        });
-        return;
-      }
-
-      authReq.auth = { authenticated: true };
-      next();
+      authenticateApiKey(token, config, authReq, res, next);
       return;
     }
 
     // JWT authentication
     if (config.mode === "jwt") {
-      if (!config.jwtSecret) {
-        console.error("AUTH_MODE=jwt but AUTH_JWT_SECRET is not configured");
-        res.status(500).json({
-          error: "Internal Server Error",
-          message: "Authentication not properly configured",
-        });
-        return;
-      }
-
-      try {
-        const decoded = jwt.verify(token, config.jwtSecret, {
-          audience: config.jwtAudience,
-          issuer: config.jwtIssuer,
-        }) as jwt.JwtPayload;
-
-        authReq.auth = {
-          authenticated: true,
-          userId: decoded.sub,
-          scopes: decoded.scope
-            ? Array.isArray(decoded.scope)
-              ? decoded.scope
-              : decoded.scope.split(" ")
-            : undefined,
-        };
-
-        next();
-      } catch (error) {
-        if (error instanceof jwt.TokenExpiredError || (error as Error).name === "TokenExpiredError") {
-          res.status(401).json({
-            error: "Unauthorized",
-            message: "Token has expired",
-          });
-          return;
-        }
-
-        if (error instanceof jwt.JsonWebTokenError || (error as Error).name === "JsonWebTokenError") {
-          res.status(401).json({
-            error: "Unauthorized",
-            message: "Invalid token",
-          });
-          return;
-        }
-
-        console.error("JWT verification error:", error);
-        res.status(500).json({
-          error: "Internal Server Error",
-          message: "Token verification failed",
-        });
-        return;
-      }
+      authenticateJwt(token, config, authReq, res, next);
+      return;
     }
 
     // Should never reach here
@@ -149,7 +187,7 @@ export function loadMcpAuthConfig(): AuthConfig {
   }
 
   const config: AuthConfig = {
-    mode: mode as "none" | "api-key" | "jwt",
+    mode: mode as AuthMode,
   };
 
   if (mode === "api-key") {
@@ -190,7 +228,7 @@ export function loadWebAuthConfig(): AuthConfig {
   }
 
   const config: AuthConfig = {
-    mode: mode as "none" | "api-key" | "jwt",
+    mode: mode as AuthMode,
   };
 
   if (mode === "api-key") {
