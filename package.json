@@ -1,7 +1,7 @@
 {
   "name": "policymcp",
-  "version": "1.0.0",
-  "description": "MCP server for scanning PDFs and exposing policy information to AI assistants",
+  "version": "0.1.0",
+  "description": "MCP server for scanning policy documents (PDF, Word, Markdown) and exposing them to AI assistants",
   "main": "dist/index.js",
   "type": "module",
   "bin": {

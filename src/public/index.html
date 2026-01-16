@@ -400,8 +400,8 @@
   <main class="container">
     <section class="upload-section">
       <div class="upload-zone" id="uploadZone">
-        <input type="file" id="fileInput" accept=".pdf">
-        <p>Drag and drop a PDF file here</p>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.md">
+        <p>Drag and drop a document here (PDF, Word, or Markdown)</p>
         <button class="btn btn-secondary" id="selectFileBtn">Or click to select file</button>
         <div class="file-name" id="fileName"></div>
         <div class="upload-form">
@@ -510,10 +510,11 @@
       e.preventDefault();
       uploadZone.classList.remove('dragover');
       const files = e.dataTransfer.files;
-      if (files.length && files[0].type === 'application/pdf') {
+      const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown'];
+      if (files.length && allowedTypes.includes(files[0].type)) {
         handleFile(files[0]);
       } else {
-        showToast('Please select a PDF file', 'error');
+        showToast('Please select a document file (PDF, Word, or Markdown)', 'error');
       }
     });
 
@@ -671,7 +672,7 @@
 
     function renderPolicies(policies) {
       if (!policies.length) {
-        policiesGrid.innerHTML = '<div class="empty-state"><p>No policies loaded yet</p><p>Upload a PDF to get started</p></div>';
+        policiesGrid.innerHTML = '<div class="empty-state"><p>No policies loaded yet</p><p>Upload a document to get started</p></div>';
         return;
       }
 
