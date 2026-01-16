@@ -190,7 +190,8 @@ Content here`;
       const mockContent = `page 1
 date: 2025-01-01
 
-Some content without a clear title`;
+some lowercase text here
+more content`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));

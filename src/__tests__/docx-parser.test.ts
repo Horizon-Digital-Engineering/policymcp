@@ -201,9 +201,9 @@ All systems must be secure.`;
     });
 
     it("should handle metadata extraction errors gracefully", async () => {
-      const mockContent = `Test Document
+      const mockContent = `some lowercase content
 
-Content here.`;
+more text here.`;
 
       vi.mocked(mammoth.extractRawText).mockResolvedValue({
         value: mockContent,

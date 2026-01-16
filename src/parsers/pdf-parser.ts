@@ -28,9 +28,10 @@ export async function parsePDF(filePath: string): Promise<ParsedDocument> {
 
   const sections = extractSections(content);
 
-  // Use PDF metadata title if available, otherwise extract from content
-  const title = info.Title && info.Title.trim()
-    ? info.Title.trim()
+  // Use PDF metadata title if available and meaningful, otherwise extract from content
+  const metadataTitle = info.Title?.trim();
+  const title = metadataTitle && metadataTitle.toLowerCase() !== "(anonymous)" && metadataTitle.toLowerCase() !== "untitled"
+    ? metadataTitle
     : extractTitle(content, filePath);
 
   const metadata = extractMetadata(content, pageCount);
