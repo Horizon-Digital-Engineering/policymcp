@@ -1,17 +1,18 @@
 import type { PolicySection, ParsedDocument } from "../types.js";
 
 // Patterns for detecting section headings
+// Using [^\n\r]* instead of [^\n]+ to prevent ReDoS attacks
 const HEADING_PATTERNS = [
   // Numbered sections: "1.", "1.1", "1.1.1", etc.
-  /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n]+)$/,
+  /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n\r]+?)$/,
   // Roman numerals: "I.", "II.", etc.
-  /^([IVXLC]{1,10}[.:-])\s*([^\n]+)$/i,
+  /^([IVXLC]{1,10}[.:-])\s*([^\n\r]+?)$/i,
   // Letter sections: "A.", "B.", etc.
-  /^([A-Z][.:-])\s*([^\n]+)$/,
+  /^([A-Z][.:-])\s*([^\n\r]+?)$/,
   // Multi-letter abbreviations: "ABC Something", "DEF Another"
-  /^([A-Z]{2,4})\s+([A-Z][^\n]+)$/,
+  /^([A-Z]{2,4})\s+([A-Z][^\n\r]+?)$/,
   // ALL CAPS headings
-  /^([A-Z][A-Z\s]{3,100})$/,
+  /^([A-Z][A-Z\s]{3,100}?)$/,
 ];
 
 interface HeadingMatch {

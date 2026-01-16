@@ -80,7 +80,8 @@ function saveMarkdownSection(
 function extractMarkdownSections(markdown: string): PolicySection[] {
   const sections: PolicySection[] = [];
   const lines = markdown.split("\n");
-  const headingRegex = /^(#{1,6})\s+(.+)$/;
+  // Use lazy quantifier +? instead of + to prevent ReDoS
+  const headingRegex = /^(#{1,6})\s+(.+?)$/;
 
   let currentSection: PolicySection | null = null;
   let contentBuffer: string[] = [];
