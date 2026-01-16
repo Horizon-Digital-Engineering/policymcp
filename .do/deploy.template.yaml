@@ -1,0 +1,26 @@
+spec:
+  name: policymcp
+  region: nyc
+  services:
+    - name: policymcp
+      github:
+        repo: Horizon-Digital-Engineering/policymcp
+        branch: main
+        deploy_on_push: true
+      build_command: npm ci && npm run build
+      run_command: node dist/index.js
+      http_port: 3000
+      instance_count: 1
+      instance_size_slug: basic-xxs
+      envs:
+        - key: HOST
+          value: "0.0.0.0"
+          scope: RUN_AND_BUILD_TIME
+        - key: PORT
+          value: "3000"
+          scope: RUN_AND_BUILD_TIME
+        - key: CORS_ORIGIN
+          value: "*"
+          scope: RUN_AND_BUILD_TIME
+      health_check:
+        http_path: /health

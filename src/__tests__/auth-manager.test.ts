@@ -1,0 +1,319 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Request, Response, NextFunction } from "express";
+
+// Mock jsonwebtoken before importing
+vi.mock("jsonwebtoken", () => ({
+  default: {
+    verify: vi.fn(),
+    TokenExpiredError: class TokenExpiredError extends Error {
+      expiredAt: Date;
+      constructor(message: string, expiredAt: Date = new Date()) {
+        super(message);
+        this.name = "TokenExpiredError";
+        this.expiredAt = expiredAt;
+      }
+    },
+    JsonWebTokenError: class JsonWebTokenError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "JsonWebTokenError";
+      }
+    },
+  },
+}));
+
+import jwt from "jsonwebtoken";
+import { createAuthMiddleware } from "../auth-manager.js";
+
+describe("auth-manager", () => {
+  let mockReq: Partial<Request>;
+  let mockRes: Partial<Response>;
+  let mockNext: vi.Mock<NextFunction>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReq = {
+      headers: {},
+    };
+    mockRes = {
+      status: vi.fn().mockReturnThis() as unknown as Response["status"],
+      json: vi.fn().mockReturnThis() as unknown as Response["json"],
+    };
+    mockNext = vi.fn() as vi.Mock<NextFunction>;
+  });
+
+  describe("createAuthMiddleware - none mode", () => {
+    it("should allow requests without authentication", () => {
+      const middleware = createAuthMiddleware({ mode: "none" });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it("should set auth.authenticated to false", () => {
+      const middleware = createAuthMiddleware({ mode: "none" });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect((mockReq as any).auth).toEqual({ authenticated: false });
+    });
+  });
+
+  describe("createAuthMiddleware - api-key mode", () => {
+    it("should reject requests without Authorization header", () => {
+      const middleware = createAuthMiddleware({
+        mode: "api-key",
+        apiKey: "test-key",
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Unauthorized",
+        message: expect.stringContaining("Missing or invalid Authorization header"),
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should reject requests with invalid Bearer format", () => {
+      const middleware = createAuthMiddleware({
+        mode: "api-key",
+        apiKey: "test-key",
+      });
+      mockReq.headers = { authorization: "Basic something" };
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should reject requests with wrong API key", () => {
+      const middleware = createAuthMiddleware({
+        mode: "api-key",
+        apiKey: "test-key",
+      });
+      mockReq.headers = { authorization: "Bearer wrong-key" };
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Unauthorized",
+        message: "Invalid API key",
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should allow requests with correct API key", () => {
+      const middleware = createAuthMiddleware({
+        mode: "api-key",
+        apiKey: "test-key",
+      });
+      mockReq.headers = { authorization: "Bearer test-key" };
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect((mockReq as any).auth).toEqual({ authenticated: true });
+      expect(mockRes.status).not.toHaveBeenCalled();
+    });
+
+    it("should return 500 if apiKey is not configured", () => {
+      const middleware = createAuthMiddleware({
+        mode: "api-key",
+      });
+      mockReq.headers = { authorization: "Bearer test-key" };
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Internal Server Error",
+        message: "Authentication not properly configured",
+      });
+      expect(consoleSpy).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("createAuthMiddleware - jwt mode", () => {
+    beforeEach(() => {
+      (vi.mocked(jwt).verify as vi.Mock).mockReset();
+    });
+
+    it("should reject requests without Authorization header", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should validate JWT with correct secret", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+        jwtAudience: "test-audience",
+        jwtIssuer: "test-issuer",
+      });
+      mockReq.headers = { authorization: "Bearer valid-token" };
+
+      (vi.mocked(jwt).verify as vi.Mock).mockReturnValue({
+        sub: "user-123",
+        scope: "read write",
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(vi.mocked(jwt).verify).toHaveBeenCalledWith(
+        "valid-token",
+        "secret",
+        {
+          audience: "test-audience",
+          issuer: "test-issuer",
+        }
+      );
+      expect(mockNext).toHaveBeenCalled();
+      expect((mockReq as any).auth).toEqual({
+        authenticated: true,
+        userId: "user-123",
+        scopes: ["read", "write"],
+      });
+    });
+
+    it("should handle scopes as array", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+      });
+      mockReq.headers = { authorization: "Bearer valid-token" };
+
+      (vi.mocked(jwt).verify as vi.Mock).mockReturnValue({
+        sub: "user-123",
+        scope: ["read", "write"],
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect((mockReq as any).auth.scopes).toEqual(["read", "write"]);
+    });
+
+    it("should handle missing scopes", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+      });
+      mockReq.headers = { authorization: "Bearer valid-token" };
+
+      (vi.mocked(jwt).verify as vi.Mock).mockReturnValue({
+        sub: "user-123",
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect((mockReq as any).auth.scopes).toBeUndefined();
+    });
+
+    it("should reject expired tokens", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+      });
+      mockReq.headers = { authorization: "Bearer expired-token" };
+
+      (vi.mocked(jwt).verify as vi.Mock).mockImplementation(() => {
+        const err = new Error("Token expired");
+        err.name = "TokenExpiredError";
+        throw err;
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Unauthorized",
+        message: "Token has expired",
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should reject invalid tokens", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+      });
+      mockReq.headers = { authorization: "Bearer invalid-token" };
+
+      (vi.mocked(jwt).verify as vi.Mock).mockImplementation(() => {
+        const err = new Error("Invalid token");
+        err.name = "JsonWebTokenError";
+        throw err;
+      });
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Unauthorized",
+        message: "Invalid token",
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it("should handle unexpected JWT errors", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+        jwtSecret: "secret",
+      });
+      mockReq.headers = { authorization: "Bearer bad-token" };
+
+      (vi.mocked(jwt).verify as vi.Mock).mockImplementation(() => {
+        throw new Error("Unexpected error");
+      });
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Internal Server Error",
+        message: "Token verification failed",
+      });
+      expect(consoleSpy).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
+    it("should return 500 if jwtSecret is not configured", () => {
+      const middleware = createAuthMiddleware({
+        mode: "jwt",
+      });
+      mockReq.headers = { authorization: "Bearer token" };
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      middleware(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(500);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        error: "Internal Server Error",
+        message: "Authentication not properly configured",
+      });
+      expect(consoleSpy).toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+  });
+});

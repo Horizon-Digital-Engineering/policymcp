@@ -1,0 +1,184 @@
+import { readFile } from "node:fs/promises";
+import { PDFParse } from "pdf-parse";
+import type { ParsedPDF, PolicySection } from "./types.js";
+
+/**
+ * Parse a PDF file and extract policy content
+ */
+export async function parsePDF(filePath: string): Promise<ParsedPDF> {
+  const dataBuffer = await readFile(filePath);
+
+  // Initialize pdf-parse v2 with the buffer
+  const parser = new PDFParse({ data: dataBuffer });
+
+  // Extract text from all pages
+  const textResult = await parser.getText();
+  const content = textResult.text;
+
+  // Extract metadata to get page count
+  const infoResult = await parser.getInfo();
+  const pageCount = infoResult.total;
+
+  // Clean up parser
+  await parser.destroy();
+
+  const sections = extractSections(content);
+  const title = extractTitle(content, filePath);
+  const metadata = extractMetadata(content, pageCount);
+
+  return {
+    title,
+    content,
+    sections,
+    metadata,
+  };
+}
+
+/**
+ * Extract sections from PDF content using common heading patterns
+ */
+function extractSections(content: string): PolicySection[] {
+  const sections: PolicySection[] = [];
+  const lines = content.split("\n");
+
+  // Patterns for detecting section headings
+  const headingPatterns = [
+    // Numbered sections: "1.", "1.1", "1.1.1", etc.
+    /^(\d+(?:\.\d+)*[.:-]?)\s*(.+)$/,
+    // Roman numerals: "I.", "II.", etc.
+    /^([IVXLC]+[.:-])\s*(.+)$/i,
+    // Letter sections: "A.", "B.", etc.
+    /^([A-Z][.:-])\s*(.+)$/,
+    // Multi-letter abbreviations: "ABC Something", "DEF Another"
+    /^([A-Z]{2,4})\s+([A-Z].+)$/,
+    // ALL CAPS headings
+    /^([A-Z][A-Z\s]{3,})$/,
+  ];
+
+  let currentSection: PolicySection | null = null;
+  let contentBuffer: string[] = [];
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) continue;
+
+    let isHeading = false;
+    let heading = "";
+    let level = 1;
+
+    for (const pattern of headingPatterns) {
+      const match = trimmedLine.match(pattern);
+      if (match) {
+        isHeading = true;
+        if (match[2]) {
+          heading = `${match[1]} ${match[2]}`.trim();
+          // Determine level from numbering depth (count dots between numbers, not trailing punctuation)
+          const numberPart = match[1].replace(/[.:-]$/, ''); // Remove trailing punctuation
+          const dots = (numberPart.match(/\./g) || []).length;
+          level = dots + 1;
+        } else {
+          heading = match[1].trim();
+        }
+        break;
+      }
+    }
+
+    if (isHeading && heading.length > 2 && heading.length < 200) {
+      // Save previous section
+      if (currentSection) {
+        currentSection.content = contentBuffer.join("\n").trim();
+        if (currentSection.content) {
+          sections.push(currentSection);
+        }
+      }
+
+      currentSection = {
+        heading,
+        content: "",
+        level,
+      };
+      contentBuffer = [];
+    } else if (currentSection) {
+      contentBuffer.push(trimmedLine);
+    }
+  }
+
+  // Don't forget the last section
+  if (currentSection) {
+    currentSection.content = contentBuffer.join("\n").trim();
+    if (currentSection.content) {
+      sections.push(currentSection);
+    }
+  }
+
+  return sections;
+}
+
+/**
+ * Extract title from PDF content
+ */
+function extractTitle(content: string, filePath: string): string {
+  const lines = content.split("\n").filter((l) => l.trim());
+
+  // Try to find a title in the first few lines
+  for (let i = 0; i < Math.min(5, lines.length); i++) {
+    const line = lines[i].trim();
+    // Look for lines that look like titles (not metadata, should start with capital, not too generic)
+    if (
+      line.length > 5 &&
+      line.length < 150 &&
+      !line.match(/^(page|date|version|effective|revision|rev|dated|some|test|content)/i) &&
+      line[0] === line[0].toUpperCase()
+    ) {
+      return line;
+    }
+  }
+
+  // Fallback to filename
+  const fileName = filePath.split("/").pop() || filePath;
+  return fileName.replace(/\.pdf$/i, "");
+}
+
+/**
+ * Extract metadata from PDF content
+ */
+function extractMetadata(
+  content: string,
+  pageCount: number
+): ParsedPDF["metadata"] {
+  const metadata: ParsedPDF["metadata"] = {
+    pageCount,
+  };
+
+  // Try to find effective date
+  const datePatterns = [
+    /effective\s*(?:date)?[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+    /dated?[:\s]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/i,
+    /(\w+\s+\d{1,2},?\s+\d{4})/i,
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      metadata.effectiveDate = match[1];
+      break;
+    }
+  }
+
+  // Try to find version
+  const versionPatterns = [
+    /version[:\s]*(\d+(?:\.\d+)*)/i,
+    /rev(?:ision)?[:\s]*(\d+(?:\.\d+)*)/i,
+    /v(\d+(?:\.\d+)*)/i,
+  ];
+
+  for (const pattern of versionPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      metadata.version = match[1];
+      break;
+    }
+  }
+
+  return metadata;
+}
