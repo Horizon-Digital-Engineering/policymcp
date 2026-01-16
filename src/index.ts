@@ -355,7 +355,8 @@ async function main() {
 
   // Get single policy
   app.get("/api/policies/:id", webAuth, (req: Request, res: Response) => {
-    const policy = policyStore.getPolicy(req.params.id);
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const policy = policyStore.getPolicy(id);
     if (!policy) {
       res.status(404).json({ error: "Policy not found" });
       return;
@@ -417,7 +418,8 @@ async function main() {
 
   // Delete policy
   app.delete("/api/policies/:id", webAuth, (req: Request, res: Response) => {
-    const deleted = policyStore.removePolicy(req.params.id);
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const deleted = policyStore.removePolicy(id);
     if (!deleted) {
       res.status(404).json({ error: "Policy not found" });
       return;
