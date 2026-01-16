@@ -35,7 +35,6 @@ vi.mock(
 
 // Import after mocking
 import { PolicyStore } from "../policy-store.js";
-import { parsePDF } from "../pdf-parser.js";
 
 describe("REST API Endpoints", () => {
   let app: Express;

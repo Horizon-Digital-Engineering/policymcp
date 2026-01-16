@@ -14,9 +14,15 @@ import { readFile } from "node:fs/promises";
 import { PDFParse } from "pdf-parse";
 import { parsePDF } from "../pdf-parser.js";
 
+interface MockPDFParser {
+  getText: ReturnType<typeof vi.fn>;
+  getInfo: ReturnType<typeof vi.fn>;
+  destroy: ReturnType<typeof vi.fn>;
+}
+
 describe("pdf-parser", () => {
   // Helper function to create mock parser instance
-  const createMockParser = (text: string, pageCount: number) => ({
+  const createMockParser = (text: string, pageCount: number): MockPDFParser => ({
     getText: vi.fn().mockResolvedValue({ text }),
     getInfo: vi.fn().mockResolvedValue({ total: pageCount }),
     destroy: vi.fn().mockResolvedValue(undefined),
@@ -41,8 +47,8 @@ This applies to all employees.`;
 
       const mockParser = createMockParser(mockContent, 5);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) {
-        return mockParser as any;
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) {
+        return mockParser as MockPDFParser;
       });
 
       const result = await parsePDF("/test/path.pdf");
@@ -72,7 +78,7 @@ Content of second section`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -101,7 +107,7 @@ Even more content`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -125,7 +131,7 @@ Who is responsible.`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -149,7 +155,7 @@ Content of third point`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -169,7 +175,7 @@ Content here`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -184,7 +190,7 @@ Some content without a clear title`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/path/to/my-policy.pdf");
 
@@ -202,7 +208,7 @@ Some content without a clear title`;
       for (const testCase of testCases) {
         const mockParser = createMockParser(testCase.content, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
         const result = await parsePDF("/test/path.pdf");
         expect(result.metadata.effectiveDate).toBe(testCase.expected);
@@ -221,7 +227,7 @@ Some content without a clear title`;
       for (const testCase of testCases) {
         const mockParser = createMockParser(testCase.content, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
         const result = await parsePDF("/test/path.pdf");
         expect(result.metadata.version).toBe(testCase.expected);
@@ -235,7 +241,7 @@ or structure`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -246,7 +252,7 @@ or structure`;
     it("should handle empty PDF content", async () => {
       const mockParser = createMockParser("", 0);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -274,7 +280,7 @@ Regular content here`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -295,7 +301,7 @@ This one has content`;
 
       const mockParser = createMockParser(mockContent, 1);
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       const result = await parsePDF("/test/path.pdf");
 
@@ -323,7 +329,7 @@ This one has content`;
       };
 
       vi.mocked(readFile).mockResolvedValue(Buffer.from("mock"));
-      vi.mocked(PDFParse).mockImplementation(function(this: any) { return mockParser as any; });
+      vi.mocked(PDFParse).mockImplementation(function(this: unknown) { return mockParser as MockPDFParser; });
 
       await expect(parsePDF("/test/invalid.pdf")).rejects.toThrow(
         "Invalid PDF"

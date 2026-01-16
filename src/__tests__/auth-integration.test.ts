@@ -6,6 +6,7 @@ import { PolicyStore } from "../policy-store.js";
 import {
   createAuthMiddleware,
   type AuthConfig,
+  type AuthenticatedRequest,
 } from "../auth-manager.js";
 
 describe("Authentication Integration Tests", () => {
@@ -33,7 +34,7 @@ describe("Authentication Integration Tests", () => {
       res.json({
         success: true,
         message: "MCP endpoint accessed",
-        auth: (req as any).auth,
+        auth: (req as AuthenticatedRequest).auth,
       });
     });
 
@@ -47,7 +48,7 @@ describe("Authentication Integration Tests", () => {
       res.json({
         success: true,
         message: "Policy uploaded",
-        auth: (req as any).auth,
+        auth: (req as AuthenticatedRequest).auth,
       });
     });
 
@@ -269,7 +270,6 @@ describe("Authentication Integration Tests", () => {
 
   describe("Mixed Auth Modes", () => {
     const MCP_API_KEY = "mcp-key";
-    const WEB_API_KEY = "web-key";
 
     beforeAll(() => {
       // MCP uses API key, Web uses JWT

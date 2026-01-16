@@ -44,15 +44,15 @@ function extractSections(content: string): PolicySection[] {
   // Patterns for detecting section headings
   const headingPatterns = [
     // Numbered sections: "1.", "1.1", "1.1.1", etc.
-    /^(\d+(?:\.\d+)*[.:-]?)\s*(.+)$/,
+    /^(\d+(?:\.\d+){0,5}[.:-]?)\s*([^\n]+)$/,
     // Roman numerals: "I.", "II.", etc.
-    /^([IVXLC]+[.:-])\s*(.+)$/i,
+    /^([IVXLC]{1,10}[.:-])\s*([^\n]+)$/i,
     // Letter sections: "A.", "B.", etc.
-    /^([A-Z][.:-])\s*(.+)$/,
+    /^([A-Z][.:-])\s*([^\n]+)$/,
     // Multi-letter abbreviations: "ABC Something", "DEF Another"
-    /^([A-Z]{2,4})\s+([A-Z].+)$/,
+    /^([A-Z]{2,4})\s+([A-Z][^\n]+)$/,
     // ALL CAPS headings
-    /^([A-Z][A-Z\s]{3,})$/,
+    /^([A-Z][A-Z\s]{3,100})$/,
   ];
 
   let currentSection: PolicySection | null = null;

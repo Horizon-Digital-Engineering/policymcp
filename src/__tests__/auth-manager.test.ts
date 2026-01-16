@@ -23,7 +23,7 @@ vi.mock("jsonwebtoken", () => ({
 }));
 
 import jwt from "jsonwebtoken";
-import { createAuthMiddleware } from "../auth-manager.js";
+import { createAuthMiddleware, type AuthenticatedRequest } from "../auth-manager.js";
 
 describe("auth-manager", () => {
   let mockReq: Partial<Request>;
@@ -57,7 +57,7 @@ describe("auth-manager", () => {
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect((mockReq as any).auth).toEqual({ authenticated: false });
+      expect((mockReq as AuthenticatedRequest).auth).toEqual({ authenticated: false });
     });
   });
 
@@ -118,7 +118,7 @@ describe("auth-manager", () => {
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
-      expect((mockReq as any).auth).toEqual({ authenticated: true });
+      expect((mockReq as AuthenticatedRequest).auth).toEqual({ authenticated: true });
       expect(mockRes.status).not.toHaveBeenCalled();
     });
 
@@ -185,7 +185,7 @@ describe("auth-manager", () => {
         }
       );
       expect(mockNext).toHaveBeenCalled();
-      expect((mockReq as any).auth).toEqual({
+      expect((mockReq as AuthenticatedRequest).auth).toEqual({
         authenticated: true,
         userId: "user-123",
         scopes: ["read", "write"],
@@ -206,7 +206,7 @@ describe("auth-manager", () => {
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect((mockReq as any).auth.scopes).toEqual(["read", "write"]);
+      expect((mockReq as AuthenticatedRequest).auth?.scopes).toEqual(["read", "write"]);
     });
 
     it("should handle missing scopes", () => {
@@ -222,7 +222,7 @@ describe("auth-manager", () => {
 
       middleware(mockReq as Request, mockRes as Response, mockNext);
 
-      expect((mockReq as any).auth.scopes).toBeUndefined();
+      expect((mockReq as AuthenticatedRequest).auth?.scopes).toBeUndefined();
     });
 
     it("should reject expired tokens", () => {
