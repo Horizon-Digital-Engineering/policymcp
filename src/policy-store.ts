@@ -3,7 +3,7 @@ import type {
   Policy,
   PolicySummary,
   PolicySearchResult,
-  ParsedPDF,
+  ParsedDocument,
 } from "./types.js";
 
 /**
@@ -13,20 +13,20 @@ export class PolicyStore {
   private policies: Map<string, Policy> = new Map();
 
   /**
-   * Add a new policy from parsed PDF data
+   * Add a new policy from parsed document data
    */
-  addPolicy(parsedPDF: ParsedPDF, sourceFile: string, category?: string): Policy {
+  addPolicy(parsedDoc: ParsedDocument, sourceFile: string, category?: string): Policy {
     const id = randomUUID();
 
     const policy: Policy = {
       id,
-      title: parsedPDF.title,
-      content: parsedPDF.content,
+      title: parsedDoc.title,
+      content: parsedDoc.content,
       sourceFile,
       category,
-      effectiveDate: parsedPDF.metadata.effectiveDate,
-      version: parsedPDF.metadata.version,
-      sections: parsedPDF.sections,
+      effectiveDate: parsedDoc.metadata.effectiveDate,
+      version: parsedDoc.metadata.version,
+      sections: parsedDoc.sections,
       extractedAt: new Date(),
     };
 

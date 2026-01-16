@@ -12,7 +12,7 @@ vi.mock("pdf-parse", () => ({
 // Import after mocking
 import { readFile } from "node:fs/promises";
 import { PDFParse } from "pdf-parse";
-import { parsePDF } from "../pdf-parser.js";
+import { parsePDF } from "../parsers/pdf-parser.js";
 
 interface MockPDFParser {
   getText: ReturnType<typeof vi.fn>;
@@ -22,9 +22,13 @@ interface MockPDFParser {
 
 describe("pdf-parser", () => {
   // Helper function to create mock parser instance
-  const createMockParser = (text: string, pageCount: number): MockPDFParser => ({
+  const createMockParser = (
+    text: string,
+    pageCount: number,
+    info: Record<string, string> = {}
+  ): MockPDFParser => ({
     getText: vi.fn().mockResolvedValue({ text }),
-    getInfo: vi.fn().mockResolvedValue({ total: pageCount }),
+    getInfo: vi.fn().mockResolvedValue({ total: pageCount, info }),
     destroy: vi.fn().mockResolvedValue(undefined),
   });
 

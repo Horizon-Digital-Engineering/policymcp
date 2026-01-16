@@ -12,7 +12,11 @@ import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { InMemoryEventStore } from "@modelcontextprotocol/sdk/examples/shared/inMemoryEventStore.js";
-import { parsePDF } from "./pdf-parser.js";
+import {
+  parseDocument,
+  getMimeTypeFromExtension,
+  SUPPORTED_MIME_TYPES,
+} from "./parsers/index.js";
 import { PolicyStore } from "./policy-store.js";
 import {
   createAuthMiddleware,
@@ -31,10 +35,10 @@ const upload = multer({
   dest: "/tmp/policymcp-uploads/",
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
+    if (SUPPORTED_MIME_TYPES.includes(file.mimetype as typeof SUPPORTED_MIME_TYPES[number])) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF files are allowed"));
+      cb(new Error("Only PDF, Word (.docx), and Markdown (.md) files are allowed"));
     }
   },
 });
@@ -51,10 +55,10 @@ function createMCPServer(): McpServer {
 
   // Register tools with Zod schemas
   server.tool(
-    "scan_pdf",
-    "Scan a PDF file and extract policy information. The policy will be stored and made available for searching and querying.",
+    "scan_document",
+    "Scan a policy document (PDF, Word, or Markdown) and extract policy information. The policy will be stored and made available for searching and querying.",
     {
-      filePath: z.string().describe("Absolute path to the PDF file to scan"),
+      filePath: z.string().describe("Absolute path to the document file to scan (PDF, .docx, or .md)"),
       category: z.string().optional().describe("Optional category to assign to this policy (e.g., 'HR', 'Security', 'Compliance')"),
     },
     async ({ filePath, category }) => {
@@ -68,7 +72,9 @@ function createMCPServer(): McpServer {
       }
 
       try {
-        const parsed = await parsePDF(resolvedPath);
+        // Detect MIME type from file extension
+        const mimeType = getMimeTypeFromExtension(resolvedPath);
+        const parsed = await parseDocument(resolvedPath, mimeType);
         const policy = policyStore.addPolicy(parsed, resolvedPath, category);
 
         return {
@@ -96,7 +102,7 @@ function createMCPServer(): McpServer {
           content: [
             {
               type: "text",
-              text: `Error parsing PDF: ${error instanceof Error ? error.message : String(error)}`,
+              text: `Error parsing document: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,
@@ -364,7 +370,7 @@ async function main() {
     res.json(policy);
   });
 
-  // Upload PDF
+  // Upload document
   app.post(
     "/api/policies",
     webAuth,
@@ -379,7 +385,7 @@ async function main() {
       const category = req.body.category as string | undefined;
 
       try {
-        const parsed = await parsePDF(tempPath);
+        const parsed = await parseDocument(tempPath, req.file.mimetype);
         const policy = policyStore.addPolicy(
           parsed,
           req.file.originalname,
@@ -410,7 +416,7 @@ async function main() {
         }
 
         const message =
-          error instanceof Error ? error.message : "Failed to parse PDF";
+          error instanceof Error ? error.message : "Failed to parse document";
         res.status(500).json({ error: message });
       }
     }

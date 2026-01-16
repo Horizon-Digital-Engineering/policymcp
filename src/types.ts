@@ -44,15 +44,23 @@ export interface PolicySearchResult {
 }
 
 /**
- * Result of PDF parsing
+ * Result of document parsing (PDF, Word, Markdown)
  */
-export interface ParsedPDF {
+export interface ParsedDocument {
   title: string;
   content: string;
   sections: PolicySection[];
   metadata: {
     effectiveDate?: string;
     version?: string;
-    pageCount: number;
+    pageCount?: number; // PDF only
+    author?: string; // All formats
+    createdDate?: string; // All formats
+    modifiedDate?: string; // All formats
   };
 }
+
+/**
+ * @deprecated Use ParsedDocument instead. This alias is kept for backward compatibility.
+ */
+export type ParsedPDF = ParsedDocument;
