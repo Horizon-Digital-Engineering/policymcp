@@ -36,7 +36,7 @@
   "license": "BUSL-1.1",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.1",
-    "cors": "^2.8.5",
+    "cors": "^2.8.6",
     "express": "^5.2.1",
     "gray-matter": "^4.0.3",
     "jszip": "^3.10.1",
